@@ -104,6 +104,8 @@ button { font: inherit; cursor: pointer; }
 .sample-note { margin: 0; font-size: var(--font-sm); color: var(--caveat); }
 
 .stream { display: grid; gap: 16px; }
+/* Grid items default to their content's width; a wide table must scroll inside its box instead */
+.stream > *, #results > * { min-width: 0; }
 .stream-head h3 { margin: 0; font-size: var(--font-xl); letter-spacing: -0.01em; overflow-wrap: anywhere; }
 .stream-head h3 .sel { color: var(--text-2); font-weight: 500; }
 .stream-head .meta { margin: 4px 0 0; display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: var(--font-sm); color: var(--text-2); }
@@ -130,12 +132,12 @@ button { font: inherit; cursor: pointer; }
 .tip span { display: block; color: var(--text-2); font-size: var(--font-xs); }
 
 .changes { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-.changes li { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start; font-size: var(--font-sm); }
+.changes li { overflow-wrap: anywhere; display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start; font-size: var(--font-sm); }
 .chip { display: inline-flex; align-items: center; gap: 5px; font-size: var(--font-xs); font-weight: 600; line-height: 1; padding: 4px 8px; border-radius: 999px; border: 1px solid; white-space: nowrap; }
 .chip.look { color: var(--caveat); background: var(--caveat-bg); border-color: var(--caveat-border); }
 .chip.ok { color: var(--pass); background: var(--pass-bg); border-color: var(--pass-border); }
 .chip svg { width: 12px; height: 12px; }
-.notes { margin: 0; padding-left: 20px; font-size: var(--font-sm); color: var(--text-2); }
+.notes { margin: 0; padding-left: 20px; font-size: var(--font-sm); color: var(--text-2); overflow-wrap: anywhere; }
 
 details.table > summary { cursor: pointer; font-weight: 600; font-size: var(--font-sm); min-height: 44px; display: flex; align-items: center; }
 .tablewrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); }

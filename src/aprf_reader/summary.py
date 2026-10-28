@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 from functools import cached_property
 
-from .report import ENGAGEMENT_NAMES, NO_SDI, PLACEMENT_NAMES, Report
+from .report import ENGAGEMENT_NAMES, PLACEMENT_NAMES, Report, uses_sdi
 
 
 # Counts where a jump up is bad news, or a drop is
@@ -64,7 +64,7 @@ class Stream:
                 out.append(Row(prev + timedelta(1), d - timedelta(1), None))
             for s in self.by_day[d].segments:
                 vals = tuple(getattr(s, a).get(k) for a, k in self.columns)
-                out.append(Row(d, d, " / ".join(s.path) or "all mail", vals))
+                out.append(Row(d, d, " / ".join(p or "(blank)" for p in s.path) or "all mail", vals))
             prev = d
         return out
 
@@ -106,8 +106,7 @@ class Stream:
             prev = r.version
         # "TBD" is the draft samples' placeholder
         out += [f"Provider note: {t}" for t in sorted({r.extra_info for r in self.by_day.values()} - {"", "TBD"})]
-        sdi = sorted({r.sdi_used for r in self.by_day.values()
-                      if r.sdi_used.split(" ", 1)[0] not in NO_SDI})
+        sdi = sorted({r.sdi_used for r in self.by_day.values() if uses_sdi(r.sdi_used)})
         if sdi:
             out.append("SDI used: " + ", ".join(sdi))
         return out
@@ -116,7 +115,7 @@ class Stream:
 def streams(reports: list[Report]) -> list[Stream]:
     groups: dict[tuple[str, str, str], dict[date, Report]] = defaultdict(dict)
     for r in reports:
-        groups[(r.source, r.dkim_domain.lower(), r.dkim_selector)][r.day] = r
+        groups[r.stream_key][r.day] = r
     return [Stream(src, dom, sel, days) for (src, dom, sel), days in sorted(groups.items())]
 
 

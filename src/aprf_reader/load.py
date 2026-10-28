@@ -14,7 +14,7 @@ from email.message import Message
 from email.parser import BytesParser
 from pathlib import Path
 
-from .report import Report, ReportError, parse
+from .report import Report, ReportError, parse_items
 
 SUFFIXES = (".json", ".json.gz", ".eml", ".mbox")
 # A daily report is a few KB; this stops a stray huge file or gzip bomb
@@ -116,16 +116,20 @@ def load(paths: Iterable[Path]) -> Loaded:
             return
         seen_bytes.add(digest)
         try:
-            reports = parse(data)
+            items = parse_items(data)
         except ReportError as e:
             out.skipped.append((where, str(e)))
             return
-        for r in reports:
+        for i, r in enumerate(items, 1):
+            label = f"{where} report {i}" if len(items) > 1 else where
+            if isinstance(r, ReportError):
+                out.skipped.append((label, str(r)))
+                continue
             # The draft does not yet say whether a resend replaces the first; keep the first
             if r.key in seen_keys:
-                out.skipped.append((where, f"same day already reported in {seen_keys[r.key]}; kept that one"))
+                out.skipped.append((label, f"same day already reported in {seen_keys[r.key]}; kept that one"))
                 continue
-            seen_keys[r.key] = where
+            seen_keys[r.key] = label
             out.reports.append(r)
 
     for path in _files(paths):

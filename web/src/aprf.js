@@ -7,8 +7,12 @@
   const DRAFT = 'draft-ietf-mailmaint-aprf-00';
   const PLACEMENT_NAMES = ['inbox', 'unwanted'];
   const ENGAGEMENT_NAMES = ['positive', 'neutral', 'negative'];
-  // sdi_used values (first word) that mean no SDI was applied (section 5.2.1)
+  // sdi_used values that mean no SDI was applied (section 5.2.1), compared on
+  // the first word without case or trailing punctuation
   const NO_SDI = ['', 'N/A', 'N/F'];
+  const usesSdi = (v) => !NO_SDI.includes(v.split(' ')[0].replace(/[;,.]+$/, '').toUpperCase());
+  // JavaScript numbers are exact only up to here
+  const MAX_COUNT = Number.MAX_SAFE_INTEGER;
   // Counts where a jump up is bad news, or a drop is
   const CHANGES = { unwanted: 'rise', negative: 'rise', inbox: 'fall' };
   const MIN_MOVE = 200;
@@ -16,6 +20,7 @@
   // A daily report is a few KB; this stops a stray huge file or gzip bomb
   const MAX_BYTES = 10 * 1024 * 1024;
   const DAY_MS = 86400000;
+  const NO_COUNTS = 'These reports carry no counts.';
   const CAVEAT = 'Counts are bucket upper bounds chosen by each provider: a ceiling, not an exact figure. ' +
     'Placement counts mail received that day; engagement counts actions taken that day on mail ' +
     'from any day. Dividing one count by another gives a ratio nobody measured.';
@@ -40,7 +45,7 @@
     if (typeof value !== 'object' || Array.isArray(value)) throw new ReportError(where + ' is not an object');
     const out = {};
     for (const [name, n] of Object.entries(value)) {
-      if (!isInt(n) || n < 0) throw new ReportError(where + '.' + name + ' is not a count: ' + JSON.stringify(n));
+      if (!isInt(n) || n < 0 || n > MAX_COUNT) throw new ReportError(where + '.' + name + ' is not a count: ' + JSON.stringify(n));
       out[name] = n;
     }
     return out;
@@ -71,8 +76,12 @@
       if (typeof h[name] !== 'string' || !h[name]) throw new ReportError('header.' + name + ' is missing');
     }
     for (const name of ['report_start', 'report_end']) {
-      if (!isInt(h[name])) throw new ReportError('header.' + name + ' is not an epoch time');
+      const v = h[name];
+      if (!isInt(v)) throw new ReportError('header.' + name + ' is not an epoch time');
+      // Seconds past 1e11 are beyond the year 5138; up to 1e14 that is milliseconds
+      if (Math.abs(v) >= 1e11 && Math.abs(v) < 1e14) throw new ReportError('header.' + name + ' looks like milliseconds, not seconds: ' + v);
     }
+    if (h.report_end < h.report_start) throw new ReportError('header.report_end is before report_start');
     const day = dayOf(h.report_end);
     const body = obj.body === undefined ? [] : obj.body;
     if (!Array.isArray(body)) throw new ReportError('body is not a list');
@@ -93,9 +102,19 @@
     };
   }
 
-  const keyOf = (r) => JSON.stringify([r.source, r.dkim_domain.toLowerCase(), r.dkim_selector, r.day]);
+  // DNS names compare without case, and bücher.example is xn--bcher-kva.example.
+  // Only plain letters, digits, dots and hyphens are converted, as in report.py.
+  function nameKey(domain) {
+    const d = domain.toLowerCase();
+    if (/^[\x00-\x7f]*$/.test(d) || !/^[\p{L}\p{N}.-]+$/u.test(d)) return d;
+    try { return new URL('http://' + d + '/').hostname; } catch (e) { return d; }
+  }
+  const streamKey = (r) => [r.source, nameKey(r.dkim_domain), r.dkim_selector.toLowerCase()];
+  const keyOf = (r) => JSON.stringify(streamKey(r).concat([r.day]));
 
-  function parse(bytes) {
+  // Each report in a document, or the reason it cannot be read, so one bad
+  // report does not cost the rest of the file
+  function parseItems(bytes) {
     let doc;
     try {
       doc = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
@@ -104,7 +123,15 @@
     }
     const items = Array.isArray(doc) ? doc : [doc];
     if (!items.length) throw new ReportError('empty list');
-    return items.map(report);
+    return items.map((o) => {
+      try { return report(o); } catch (e) { if (e instanceof ReportError) return e; throw e; }
+    });
+  }
+
+  function parse(bytes) {
+    const items = parseItems(bytes);
+    for (const r of items) if (r instanceof ReportError) throw r;
+    return items;
   }
 
   // ---- load.py ----
@@ -264,19 +291,21 @@
       const digest = await sha256(data);
       if (seenBytes.has(digest)) { out.skipped.push([where, 'duplicate of a file already read']); return; }
       seenBytes.add(digest);
-      let reports;
-      try { reports = parse(data); } catch (e) {
+      let items;
+      try { items = parseItems(data); } catch (e) {
         if (!(e instanceof ReportError)) throw e;
         out.skipped.push([where, e.message]);
         return;
       }
-      for (const r of reports) {
+      items.forEach((r, i) => {
+        const label = items.length > 1 ? where + ' report ' + (i + 1) : where;
+        if (r instanceof ReportError) { out.skipped.push([label, r.message]); return; }
         // The draft does not yet say whether a resend replaces the first; keep the first
         const k = keyOf(r);
-        if (seenKeys.has(k)) { out.skipped.push([where, 'same day already reported in ' + seenKeys.get(k) + '; kept that one']); continue; }
-        seenKeys.set(k, where);
+        if (seenKeys.has(k)) { out.skipped.push([label, 'same day already reported in ' + seenKeys.get(k) + '; kept that one']); return; }
+        seenKeys.set(k, label);
         out.reports.push(r);
-      }
+      });
     }
 
     for (const { name, bytes } of files) {
@@ -342,7 +371,7 @@
     for (const d of days) {
       if (prev !== null && between(prev, d) > 1) s.rows.push({ day: addDays(prev, 1), until: addDays(d, -1), segment: null, values: [] });
       for (const seg of byDay.get(d).segments) {
-        s.rows.push({ day: d, until: d, segment: seg.path.join(' / ') || 'all mail', values: s.columns.map(([a, k]) => (k in seg[a] ? seg[a][k] : null)) });
+        s.rows.push({ day: d, until: d, segment: seg.path.map((p) => p || '(blank)').join(' / ') || 'all mail', values: s.columns.map(([a, k]) => (k in seg[a] ? seg[a][k] : null)) });
       }
       prev = d;
     }
@@ -383,7 +412,7 @@
     // "TBD" is the draft samples' placeholder
     const extra = [...new Set(days.map((d) => byDay.get(d).extra_info))].filter((t) => t !== '' && t !== 'TBD').sort(cmp);
     for (const t of extra) notes.push('Provider note: ' + t);
-    const sdi = [...new Set(days.map((d) => byDay.get(d).sdi_used))].filter((v) => !NO_SDI.includes(v.split(' ')[0])).sort(cmp);
+    const sdi = [...new Set(days.map((d) => byDay.get(d).sdi_used))].filter(usesSdi).sort(cmp);
     if (sdi.length) notes.push('SDI used: ' + sdi.join(', '));
     s.notes = notes;
     return s;
@@ -392,7 +421,7 @@
   function streams(reports) {
     const groups = new Map();
     for (const r of reports) {
-      const k = JSON.stringify([r.source, r.dkim_domain.toLowerCase(), r.dkim_selector]);
+      const k = JSON.stringify(streamKey(r));
       if (!groups.has(k)) groups.set(k, new Map());
       groups.get(k).set(r.day, r);
     }
@@ -434,6 +463,7 @@
     for (const s of ss) {
       lines.push('## ' + md(s.source) + ': ' + md(s.domain) + ', selector ' + md(s.selector), '', span(s), '');
       const cols = s.columns.map(([, k]) => k);
+      if (!cols.length) { lines.push(NO_COUNTS, ''); continue; }
       lines.push('| Day | Segment | ' + cols.map(md).join(' | ') + ' |');
       lines.push('|---|---|' + '---:|'.repeat(cols.length));
       for (const row of s.rows) {
@@ -494,6 +524,7 @@ tr.gap td{background:var(--gap);color:var(--muted)}tr.trend td{border-bottom:2px
     for (const s of ss) {
       const cols = s.columns.map(([, k]) => k);
       parts.push('<h2>' + esc(s.source) + ': ' + esc(s.domain) + ', selector ' + esc(s.selector) + '</h2>');
+      if (!cols.length) { parts.push('<p class=muted>' + esc(span(s)) + '</p><p>' + NO_COUNTS + '</p>'); continue; }
       parts.push('<p class=muted>' + esc(span(s)) + '</p><div class=wrap><table><thead><tr><th>Day<th>Segment');
       parts.push(cols.map((c) => '<th>' + esc(c)).join('') + '</thead><tbody>');
       parts.push('<tr class=trend><td>Trend<td class=muted>sum per day');
@@ -512,7 +543,7 @@ tr.gap td{background:var(--gap);color:var(--muted)}tr.trend td{border-bottom:2px
     return parts.join('\n') + '\n';
   }
 
-  const APRF = { DRAFT, CAVEAT, ReportError, parse, load, wanted, streams, toDict, toMarkdown, toHtml, span, rowDay, plural, fmt, addDays, dayOffset: between };
+  const APRF = { DRAFT, CAVEAT, NO_COUNTS, ReportError, parse, load, wanted, streams, toDict, toMarkdown, toHtml, span, rowDay, plural, fmt, addDays, dayOffset: between };
   root.APRF = APRF;
   if (typeof module !== 'undefined' && module.exports) module.exports = APRF;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -114,7 +114,10 @@
     for (const m of [1, 2, 4, 5, 10]) if (m * p >= max) return m * p;
     return 10 * p;
   }
-  const short = (v) => (v >= 10000 ? (v / 1000).toLocaleString('en-US', { maximumFractionDigits: 0 }) + 'k' : v >= 1000 ? (v / 1000).toLocaleString('en-US', { maximumFractionDigits: 1 }) + 'k' : String(v));
+  const short = (v) => {
+    const f = (n, unit) => n.toLocaleString('en-US', { maximumFractionDigits: 1 }) + unit;
+    return v >= 1e9 ? f(v / 1e9, 'B') : v >= 1e6 ? f(v / 1e6, 'M') : v >= 1000 ? f(v / 1000, 'k') : String(v);
+  };
 
   function chart(stream, col) {
     const name = stream.columns[col][1];

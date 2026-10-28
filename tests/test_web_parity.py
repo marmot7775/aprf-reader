@@ -52,7 +52,8 @@ def email(payload: bytes, subtype: str, filename: str | None, cte: str | None = 
     return msg
 
 
-@pytest.mark.parametrize("name", ["draft_sample_1.json", "draft_sample_2.json", "comcast_beta.json", "sample_six_weeks.json"])
+@pytest.mark.parametrize("name", ["draft_sample_1.json", "draft_sample_2.json", "comcast_beta.json", "sample_six_weeks.json",
+                                  "stress_100.json"])
 def test_fixtures(name):
     same([FIX / name])
 

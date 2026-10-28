@@ -11,6 +11,8 @@ from .load import Loaded
 from .report import DRAFT
 from .summary import Row, Stream, streams
 
+NO_COUNTS = "These reports carry no counts."
+
 CAVEAT = (
     "Counts are bucket upper bounds chosen by each provider: a ceiling, not an exact figure. "
     "Placement counts mail received that day; engagement counts actions taken that day on mail "
@@ -50,6 +52,9 @@ def to_markdown(loaded: Loaded) -> str:
     for s in ss:
         lines += [f"## {_md(s.source)}: {_md(s.domain)}, selector {_md(s.selector)}", "", _span(s), ""]
         cols = [k for _, k in s.columns]
+        if not cols:
+            lines += [NO_COUNTS, ""]
+            continue
         lines.append("| Day | Segment | " + " | ".join(_md(c) for c in cols) + " |")
         lines.append("|---|---|" + "---:|" * len(cols))
         for row in s.rows:
@@ -112,6 +117,9 @@ def to_html(loaded: Loaded) -> str:
     for s in ss:
         cols = [k for _, k in s.columns]
         parts.append(f"<h2>{e(s.source)}: {e(s.domain)}, selector {e(s.selector)}</h2>")
+        if not cols:
+            parts.append(f"<p class=muted>{e(_span(s))}</p><p>{NO_COUNTS}</p>")
+            continue
         parts.append(f"<p class=muted>{e(_span(s))}</p><div class=wrap><table><thead><tr><th>Day<th>Segment")
         parts.append("".join(f"<th>{e(c)}" for c in cols) + "</thead><tbody>")
         parts.append("<tr class=trend><td>Trend<td class=muted>sum per day")
@@ -166,6 +174,13 @@ def _bars(points: list[tuple[int, int]], width: int) -> str:
     return "".join(" " if v is None else BARS[min(7, v * 7 // top)] if v else BARS[0] for v in cells)
 
 
+def _spread(points: list[tuple[int, int]]) -> str:
+    lo, hi = min(v for _, v in points), max(v for _, v in points)
+    if lo == hi:
+        return f"{lo:,}" if len(points) == 1 else f"{lo:,} every day"
+    return f"{lo:,} to {hi:,}"
+
+
 def _date(d) -> str:
     return f"{d:%b} {d.day}"
 
@@ -195,10 +210,13 @@ def to_terminal(loaded: Loaded, color: bool = True, width: int = 100) -> str:
             line += st.dim(" · ") + st.warn(f"{_plural(s.missing, 'day')} with no report")
         out += [line, ""]
         names = [k for _, k in s.columns]
+        if not names:
+            out += ["  " + st.dim(NO_COUNTS), ""]
+            continue
         nw = max([len(n) for n in names] + [5])
         trends = [s.trend(i) for i in range(len(names))]
         latest = [f"{t[-1][1]:,}" for t in trends]
-        ranges = [f"{min(v for _, v in t):,} to {max(v for _, v in t):,}" for t in trends]
+        ranges = [_spread(t) for t in trends]
         lw, rw = max(len(x) for x in latest + ["latest"]), max(len(x) for x in ranges + ["range"])
         bw = max(10, min(60, width - (2 + nw + 2 + lw + 2 + rw + 2)))
         out.append(st.dim(f"  {'':<{nw}}  {'latest':>{lw}}  {'range':<{rw}}  trend"))
@@ -216,7 +234,8 @@ def to_terminal(loaded: Loaded, color: bool = True, width: int = 100) -> str:
         out.append("")
     if loaded.skipped:
         out.append(st.warn(f"Skipped {len(loaded.skipped)}"))
-        out += [st.dim(f"  {w}: {r}") for w, r in loaded.skipped]
+        for w, r in loaded.skipped:
+            out += [st.dim(line) for line in _wrap(f"{w}: {r}", width - 2, "  ")]
         out.append("")
     out.append(st.dim(f"aprf-reader {__version__}, {DRAFT}. Daily tables: --markdown, or --html for a page."))
     return "\n".join(out) + "\n"

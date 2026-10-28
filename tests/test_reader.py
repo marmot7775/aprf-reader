@@ -234,3 +234,24 @@ def test_cli_terminal_when_interactive(monkeypatch, capsys):
     assert out.startswith("APRF placement summary") and "\033[" not in out
     assert main([str(FIX / "sample_six_weeks.json"), "--markdown"]) == 0
     assert capsys.readouterr().out.startswith("# APRF placement summary")
+
+
+def test_stress_set_one_bad_report_does_not_cost_the_file():
+    loaded = load([FIX / "stress_100.json"])
+    assert len(loaded.reports) == 88
+    reasons = {w.rsplit(" ", 1)[-1]: r for w, r in loaded.skipped}
+    assert reasons["73"] == 'body[0].engagement.positive is not a count: "100"'
+    assert reasons["79"] == "header.report_end is before report_start"
+    assert reasons["81"].startswith("header.report_start looks like milliseconds")
+    assert "report 63" in reasons["64"]  # bücher.example is xn--bcher-kva.example
+    assert "report 3" in reasons["70"]  # DNS-AUDIT.COM / SELECTOR1 is dns-audit.com / selector1
+    ss = {(s.source, s.domain, s.selector): s for s in streams(loaded.reports)}
+    obj = report(0)
+    obj["body"][0]["classification"]["unwanted"] = 100.0
+    assert parse(json.dumps(obj).encode())[0].segments[0].classification["unwanted"] == 100
+    for sel in ("sdi0", "sdi1", "sdi2", "sdi3", "sdi4"):  # n/a, "N/A ", "", null, N/F;
+        assert not ss[("Comcast/Xfinity", "dns-audit.com", sel)].notes, sel
+    blank = ss[("Comcast/Xfinity", "dns-audit.com", "s13")]
+    assert "(blank)" in [r.segment for r in blank.rows]
+    assert not ss[("Comcast/Xfinity", "dns-audit.com", "s8")].columns
+    assert "These reports carry no counts." in to_markdown(loaded)
