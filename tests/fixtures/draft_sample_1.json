@@ -1,0 +1,64 @@
+[
+  {
+    "header": {
+      "version": 42,
+      "source": "Receiver MBP, Inc.",
+      "dkim_domain": "example.com",
+      "dkim_selector": "selector1",
+      "report_start": 1709164800,
+      "report_end": 1709251199,
+      "contact_info": "reports@mbp.net",
+      "extra_info": "TBD",
+      "sdi_used": "UniqueHeaderName,^"
+    },
+    "body": [
+      {
+        "segment": [
+          "Seg1",
+          "Seg2",
+          "Seg3"
+        ],
+        "classification": {
+          "inbox": 10000,
+          "unwanted": 500
+        },
+        "engagement": {
+          "positive": 300,
+          "negative": 200,
+          "neutral": 50
+        }
+      },
+      {
+        "segment": [
+          "Seg1",
+          "Seg2",
+          "Other"
+        ],
+        "classification": {
+          "inbox": 200,
+          "unwanted": 50
+        },
+        "engagement": {
+          "positive": 50,
+          "negative": 20,
+          "neutral": 0
+        }
+      },
+      {
+        "segment": [
+          "Seg1",
+          "Other"
+        ],
+        "classification": {
+          "inbox": 50,
+          "unwanted": 50
+        },
+        "engagement": {
+          "positive": 50,
+          "negative": 50,
+          "neutral": 50
+        }
+      }
+    ]
+  }
+]

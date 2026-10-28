@@ -1,0 +1,28 @@
+[
+  {
+    "header": {
+      "version": 4,
+      "source": "Receiver MBP, Inc.",
+      "dkim_domain": "example.com",
+      "dkim_selector": "sel1",
+      "report_start": 1709164800,
+      "report_end": 1709251199,
+      "contact_info": "reports@mbp.net",
+      "extra_info": "TBD",
+      "sdi_used": "N/F"
+    },
+    "body": [
+      {
+        "classification": {
+          "inbox": 10000,
+          "unwanted": 100
+        },
+        "engagement": {
+          "positive": 200,
+          "negative": 100,
+          "neutral": 20
+        }
+      }
+    ]
+  }
+]
