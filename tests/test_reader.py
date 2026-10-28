@@ -8,7 +8,8 @@ import pytest
 
 from aprf_reader.cli import main
 from aprf_reader.load import load
-from aprf_reader.render import streams, to_html, to_markdown
+from aprf_reader.render import to_html, to_markdown
+from aprf_reader.summary import streams
 from aprf_reader.report import ReportError, parse
 
 FIX = Path(__file__).parent / "fixtures"
@@ -80,6 +81,18 @@ def test_load_gz_eml_folder_and_skips(tmp_path):
     assert "duplicate" in reasons["copy.json"] and "same day" in reasons["resend.json"]
 
 
+def test_hostile_files_skipped_not_crashed(tmp_path):
+    (tmp_path / "deep.json").write_text("[" * 100_000 + "]" * 100_000)
+    write(tmp_path / "far.json", report(0, report_end=10**20))
+    good = gzip.compress(json.dumps(report(0)).encode())
+    (tmp_path / "bad-deflate.json.gz").write_bytes(good[:10] + b"\x07" * (len(good) - 10))
+    (tmp_path / "truncated.json.gz").write_bytes(good[:-12])
+    loaded = load([tmp_path])
+    assert not loaded.reports and len(loaded.skipped) == 4
+    reasons = " ".join(r for _, r in loaded.skipped)
+    assert "nested too deeply" in reasons and "out of range" in reasons
+
+
 def test_gzip_bomb_skipped(tmp_path):
     (tmp_path / "big.json.gz").write_bytes(gzip.compress(b" " * (11 * 1024 * 1024)))
     loaded = load([tmp_path])
@@ -93,9 +106,12 @@ def test_stream_gaps_versions_and_columns(tmp_path):
     ss = streams(load([tmp_path]).reports)
     assert [s.source for s in ss] == ["Comcast", "Other MBP"]
     s = ss[0]
-    assert s.missing == 2 and len(s.days) == 4
-    assert s.placement == ["inbox", "unwanted"] and s.engagement == ["positive", "negative"]
-    notes = " ".join(s.notes())
+    assert s.missing == 2
+    assert [k for _, k in s.columns] == ["inbox", "unwanted", "positive", "negative"]
+    gaps = [(r.day, r.until) for r in s.rows if r.segment is None]
+    assert gaps == [(date(2026, 10, 2), date(2026, 10, 3))]  # one row per run, not per day
+    assert [x for x, _ in s.trend(0)] == [0, 3]
+    notes = " ".join(s.notes)
     assert "SDI" not in notes  # N/F means none
     assert "changed from 1 to 2 on 2026-10-04" in notes and "replies" in notes
 

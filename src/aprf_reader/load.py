@@ -5,6 +5,7 @@ from __future__ import annotations
 import gzip
 import hashlib
 import io
+import zlib
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
 from email import policy
@@ -73,7 +74,7 @@ def load(paths: Iterable[Path]) -> Loaded:
     for path in _files(paths):
         try:
             payloads = list(_payloads(path))
-        except (OSError, EOFError, gzip.BadGzipFile, ReportError) as e:
+        except (OSError, EOFError, zlib.error, ReportError) as e:
             out.skipped.append((str(path), str(e)))
             continue
         for where, data in payloads:

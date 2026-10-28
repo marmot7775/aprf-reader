@@ -12,6 +12,12 @@ from datetime import UTC, date, datetime
 
 DRAFT = "draft-ietf-mailmaint-aprf-00"
 
+# Names the draft defines, in display order; providers may add others
+PLACEMENT_NAMES = ("inbox", "unwanted")
+ENGAGEMENT_NAMES = ("positive", "neutral", "negative")
+# sdi_used values that mean no SDI was applied (section 5.2.1)
+NO_SDI = ("", "N/A", "N/F")
+
 
 class ReportError(ValueError):
     """The data is not an APRF report this module can read."""
@@ -42,11 +48,15 @@ class Report:
     @property
     def day(self) -> date:
         # Section 8: the report's date is its ending date, in UTC
-        return datetime.fromtimestamp(self.report_end, UTC).date()
+        return _day(self.report_end)
 
     @property
     def key(self) -> tuple[str, str, str, date]:
         return (self.source, self.dkim_domain.lower(), self.dkim_selector, self.day)
+
+
+def _day(epoch: int) -> date:
+    return datetime.fromtimestamp(epoch, UTC).date()
 
 
 def _counts(value: object, where: str) -> dict[str, int]:
@@ -96,6 +106,10 @@ def _report(obj: object) -> Report:
     for name in ("report_start", "report_end"):
         if isinstance(h.get(name), bool) or not isinstance(h.get(name), int):
             raise ReportError(f"header.{name} is not an epoch time")
+    try:
+        _day(h["report_end"])
+    except (OverflowError, OSError, ValueError):
+        raise ReportError(f"header.report_end is out of range: {h['report_end']}") from None
     body = obj.get("body", [])
     if not isinstance(body, list):
         raise ReportError("body is not a list")
@@ -119,6 +133,8 @@ def parse(data: bytes) -> list[Report]:
         doc = json.loads(data)
     except (UnicodeDecodeError, json.JSONDecodeError) as e:
         raise ReportError(f"not JSON: {e}") from None
+    except RecursionError:
+        raise ReportError("JSON nested too deeply") from None
     items = doc if isinstance(doc, list) else [doc]
     if not items:
         raise ReportError("empty list")

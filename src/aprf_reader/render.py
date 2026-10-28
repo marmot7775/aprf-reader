@@ -1,97 +1,19 @@
-"""Group reports into streams and write Markdown and HTML summaries."""
+"""Write a stream summary as Markdown or as a self-contained HTML page."""
 
 from __future__ import annotations
 
 import html
-from collections import defaultdict
-from dataclasses import dataclass
-from datetime import date, timedelta
 
 from . import __version__
 from .load import Loaded
-from .report import DRAFT, Report
-
-# Draft names first in a fixed order; anything else a provider adds follows, sorted
-PLACEMENT_ORDER = ("inbox", "unwanted")
-ENGAGEMENT_ORDER = ("positive", "neutral", "negative")
+from .report import DRAFT
+from .summary import Row, Stream, streams
 
 CAVEAT = (
     "Counts are bucket upper bounds chosen by each provider: a ceiling, not an exact figure. "
     "Placement counts mail received that day; engagement counts actions taken that day on mail "
     "from any day. Dividing one count by another gives a ratio nobody measured."
 )
-
-
-@dataclass
-class Stream:
-    source: str
-    domain: str
-    selector: str
-    by_day: dict[date, Report]
-
-    @property
-    def days(self) -> list[date]:
-        first, last = min(self.by_day), max(self.by_day)
-        return [first + timedelta(n) for n in range((last - first).days + 1)]
-
-    @property
-    def missing(self) -> int:
-        return len(self.days) - len(self.by_day)
-
-    def _keys(self, attr: str, order: tuple[str, ...]) -> list[str]:
-        seen = {k for r in self.by_day.values() for s in r.segments for k in getattr(s, attr)}
-        return [k for k in order if k in seen] + sorted(seen - set(order))
-
-    @property
-    def placement(self) -> list[str]:
-        return self._keys("classification", PLACEMENT_ORDER)
-
-    @property
-    def engagement(self) -> list[str]:
-        return self._keys("engagement", ENGAGEMENT_ORDER)
-
-    def rows(self) -> list[tuple[date, str, list[int | None]] | tuple[date, None, None]]:
-        """One row per segment per day; (day, None, None) for a day with no report."""
-        out: list = []
-        for d in self.days:
-            r = self.by_day.get(d)
-            if r is None:
-                out.append((d, None, None))
-                continue
-            for s in r.segments:
-                vals = [s.classification.get(k) for k in self.placement] + [s.engagement.get(k) for k in self.engagement]
-                out.append((d, " / ".join(s.path) or "all mail", vals))
-        return out
-
-    def totals(self, d: date) -> list[int | None]:
-        """Per-day sum across segments, for the trend line. None when the day had no report."""
-        r = self.by_day.get(d)
-        if r is None:
-            return [None] * (len(self.placement) + len(self.engagement))
-        cols = [("classification", k) for k in self.placement] + [("engagement", k) for k in self.engagement]
-        return [sum(getattr(s, a).get(k, 0) for s in r.segments) for a, k in cols]
-
-    def notes(self) -> list[str]:
-        out = []
-        prev: str | None = None
-        for d in sorted(self.by_day):
-            v = self.by_day[d].version
-            if prev is not None and v != prev:
-                out.append(f"Report version changed from {prev} to {v} on {d}: the provider may have changed what a category counts.")
-            prev = v
-        for text in sorted({r.extra_info for r in self.by_day.values()} - {"", "TBD"}):
-            out.append(f"Provider note: {text}")
-        sdi = sorted({r.sdi_used for r in self.by_day.values()} - {"", "N/A", "N/F"})
-        if sdi:
-            out.append("SDI used: " + ", ".join(sdi))
-        return out
-
-
-def streams(reports: list[Report]) -> list[Stream]:
-    groups: dict[tuple[str, str, str], dict[date, Report]] = defaultdict(dict)
-    for r in reports:
-        groups[(r.source, r.dkim_domain.lower(), r.dkim_selector)][r.day] = r
-    return [Stream(src, dom, sel, days) for (src, dom, sel), days in sorted(groups.items())]
 
 
 def _n(v: int | None) -> str:
@@ -111,9 +33,12 @@ def _counts(loaded: Loaded, ss: list[Stream]) -> str:
 
 
 def _span(s: Stream) -> str:
-    days = s.days
     gap = f", {_plural(s.missing, 'day')} with no report" if s.missing else ""
-    return f"{days[0]} to {days[-1]}: {_plural(len(s.by_day), 'report')}{gap}"
+    return f"{s.first} to {s.last}: {_plural(len(s.by_day), 'report')}{gap}"
+
+
+def _day(row: Row) -> str:
+    return str(row.day) if row.until == row.day else f"{row.day} to {row.until}"
 
 
 def to_markdown(loaded: Loaded) -> str:
@@ -121,34 +46,38 @@ def to_markdown(loaded: Loaded) -> str:
     lines = ["# APRF placement summary", "", f"{_counts(loaded, ss)} {CAVEAT}", ""]
     for s in ss:
         lines += [f"## {_md(s.source)}: {_md(s.domain)}, selector {_md(s.selector)}", "", _span(s), ""]
-        cols = s.placement + s.engagement
+        cols = [k for _, k in s.columns]
         lines.append("| Day | Segment | " + " | ".join(_md(c) for c in cols) + " |")
         lines.append("|---|---|" + "---:|" * len(cols))
-        for d, seg, vals in s.rows():
-            if seg is None:
-                lines.append(f"| {d} | no report |" + " |" * len(cols))
+        for row in s.rows:
+            if row.segment is None:
+                lines.append(f"| {_day(row)} | no report |" + " |" * len(cols))
             else:
-                lines.append(f"| {d} | {_md(seg)} | " + " | ".join(_n(v) for v in vals) + " |")
+                lines.append(f"| {row.day} | {_md(row.segment)} | " + " | ".join(_n(v) for v in row.values) + " |")
         lines.append("")
-        lines += [f"- {_md(n)}" for n in s.notes()]
-        if s.notes():
-            lines.append("")
+        if s.notes:
+            lines += [f"- {_md(n)}" for n in s.notes] + [""]
     if loaded.skipped:
         lines += ["## Skipped", ""] + [f"- {_md(w)}: {_md(r)}" for w, r in loaded.skipped] + [""]
     lines.append(f"Read by aprf-reader {__version__} against {DRAFT}.")
     return "\n".join(lines) + "\n"
 
 
-def _spark(values: list[int | None]) -> str:
-    pts = [(i, v) for i, v in enumerate(values) if v is not None]
-    if len(pts) < 2:
+def _spark(points: list[tuple[int, int]]) -> str:
+    """Line over (day offset, value) points, broken where days are missing."""
+    if len(points) < 2:
         return ""
     w, h = 96, 20
-    top = max(v for _, v in pts) or 1
-    step = w / (len(values) - 1)
-    xy = " ".join(f"{i * step:.1f},{h - 1 - (v / top) * (h - 2):.1f}" for i, v in pts)
-    return (f'<svg class="spark" viewBox="0 0 {w} {h}" width="{w}" height="{h}" aria-hidden="true">'
-            f'<polyline points="{xy}" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>')
+    top = max(v for _, v in points) or 1
+    step = w / points[-1][0]
+    path, prev = [], None
+    for x, v in points:
+        cmd = "L" if prev is not None and x - prev == 1 else "M"
+        path.append(f"{cmd}{x * step:.1f},{h - 1 - (v / top) * (h - 2):.1f}")
+        prev = x
+    return (f'<svg class="spark" viewBox="-1 0 {w + 2} {h}" width="{w}" height="{h}" aria-hidden="true">'
+            f'<path d="{" ".join(path)}" fill="none" stroke="currentColor" stroke-width="1.5" '
+            'stroke-linecap="round"/></svg>')
 
 
 CSS = """
@@ -176,21 +105,20 @@ def to_html(loaded: Loaded) -> str:
         f"<p>{_counts(loaded, ss)}</p><p class=muted>{e(CAVEAT)}</p>",
     ]
     for s in ss:
-        cols = s.placement + s.engagement
+        cols = [k for _, k in s.columns]
         parts.append(f"<h2>{e(s.source)}: {e(s.domain)}, selector {e(s.selector)}</h2>")
         parts.append(f"<p class=muted>{e(_span(s))}</p><div class=wrap><table><thead><tr><th>Day<th>Segment")
         parts.append("".join(f"<th>{e(c)}" for c in cols) + "</thead><tbody>")
-        daily = [s.totals(d) for d in s.days]
         parts.append("<tr class=trend><td>Trend<td class=muted>sum per day")
-        parts.append("".join(f"<td>{_spark([row[i] for row in daily])}" for i in range(len(cols))))
-        for d, seg, vals in s.rows():
-            if seg is None:
-                parts.append(f"<tr class=gap><td>{d}<td>no report" + "<td>" * len(cols))
+        parts.append("".join(f"<td>{_spark(s.trend(i))}" for i in range(len(cols))))
+        for row in s.rows:
+            if row.segment is None:
+                parts.append(f"<tr class=gap><td>{_day(row)}<td>no report" + "<td>" * len(cols))
             else:
-                parts.append(f"<tr><td>{d}<td>{e(seg)}" + "".join(f"<td>{_n(v)}" for v in vals))
+                parts.append(f"<tr><td>{row.day}<td>{e(row.segment)}" + "".join(f"<td>{_n(v)}" for v in row.values))
         parts.append("</tbody></table></div>")
-        if s.notes():
-            parts.append("<ul>" + "".join(f"<li>{e(n)}" for n in s.notes()) + "</ul>")
+        if s.notes:
+            parts.append("<ul>" + "".join(f"<li>{e(n)}" for n in s.notes) + "</ul>")
     if loaded.skipped:
         parts.append("<h2>Skipped</h2><ul>" + "".join(f"<li>{e(w)}: {e(r)}" for w, r in loaded.skipped) + "</ul>")
     parts.append(f"<p class=muted>Read by aprf-reader {e(__version__)} against {DRAFT}. Nothing left this computer.</p>")
