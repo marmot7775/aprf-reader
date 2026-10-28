@@ -1,5 +1,6 @@
 import gzip
 import json
+import mailbox
 from datetime import date
 from email.message import EmailMessage
 from pathlib import Path
@@ -89,6 +90,45 @@ def test_load_gz_eml_folder_and_skips(tmp_path):
     reasons = dict((Path(w.split(" ")[0]).name, r) for w, r in loaded.skipped)
     assert set(reasons) == {"copy.json", "resend.json", "broken.json"}
     assert "duplicate" in reasons["copy.json"] and "same day" in reasons["resend.json"]
+
+
+def report_email(day: int, payload: bytes, subtype: str, filename: str | None) -> EmailMessage:
+    msg = EmailMessage()
+    msg["From"] = "aprf-noreply@alerts.xfinity.com"
+    msg["Subject"] = f"APRF: day {day}"
+    msg.set_content("report attached")
+    msg.add_attachment(payload, maintype="application", subtype=subtype, filename=filename)
+    return msg
+
+
+def test_attachment_found_by_content(tmp_path):
+    # A provider may label the file octet-stream or give it no useful name
+    raw = json.dumps(report(0)).encode()
+    (tmp_path / "plain.eml").write_bytes(report_email(0, raw, "octet-stream", "20261001_example.com_s1_Comcast").as_bytes())
+    gz = gzip.compress(json.dumps(report(1)).encode())
+    (tmp_path / "gz.eml").write_bytes(report_email(1, gz, "octet-stream", None).as_bytes())
+    loaded = load([tmp_path])
+    assert sorted(r.day.day for r in loaded.reports) == [1, 2] and not loaded.skipped
+
+
+def test_mbox_export(tmp_path):
+    (tmp_path / "Reports.mbox").mkdir()  # Apple Mail's export layout
+    box = mailbox.mbox(tmp_path / "Reports.mbox" / "mbox")
+    box.add(report_email(0, gzip.compress(json.dumps(report(0)).encode()), "gzip", "a.json.gz"))
+    box.add(report_email(1, json.dumps(report(1)).encode(), "json", "b.json"))
+    note = EmailMessage()
+    note["Subject"] = "not a report"
+    note.set_content("hello")
+    box.add(note)
+    box.add(note)
+    box.add(report_email(2, b"\x1f\x8b broken", "gzip", "c.json.gz"))
+    box.add(report_email(3, b"not gzip at all", "gzip", "d.json.gz"))
+    box.add(report_email(4, json.dumps(report(4)).encode(), "json", "e.json"))
+    box.close()
+    loaded = load([tmp_path])
+    assert sorted(r.day.day for r in loaded.reports) == [1, 2, 5]  # read on past bad messages
+    reasons = [r for _, r in loaded.skipped]
+    assert len(reasons) == 3 and "2 messages with no report attached" in reasons
 
 
 def test_hostile_files_skipped_not_crashed(tmp_path):

@@ -13,7 +13,7 @@ from .render import to_html, to_markdown
 
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="aprf-reader", description="Summarise APRF placement reports.")
-    p.add_argument("paths", nargs="+", type=Path, help="report files (.json, .json.gz, .eml) or folders")
+    p.add_argument("paths", nargs="+", type=Path, help="report files (.json, .json.gz, .eml, .mbox) or folders")
     p.add_argument("--md", type=Path, help="write the Markdown summary here instead of printing it")
     p.add_argument("--html", type=Path, help="also write a self-contained HTML page here")
     p.add_argument("--version", action="version", version=f"aprf-reader {__version__}")

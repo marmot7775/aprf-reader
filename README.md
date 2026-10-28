@@ -4,7 +4,7 @@ Reads APRF (Aggregate Performance Reporting) reports and tells you where the
 mail you signed landed: how much reached the inbox, how much was treated as
 unwanted, and how recipients reacted, day by day and per DKIM selector.
 
-**Status: 0.1, beta.** Reads reports in the format of draft-ietf-mailmaint-aprf-00.
+**Status: 0.2, beta.** Reads reports in the format of draft-ietf-mailmaint-aprf-00.
 
 ## What APRF is
 
@@ -28,10 +28,16 @@ environment, or with pip (`pip3` on some systems) inside a virtual environment.
 pipx install aprf-reader
 aprf-reader reports/                      # Markdown summary to the terminal
 aprf-reader reports/ --html summary.html  # and a page you can open or share
+aprf-reader APRF.mbox                     # a mail folder exported as mbox
 ```
 
 Point it at report files (`.json`, `.json.gz`), saved report emails (`.eml`),
-or folders of them. Folders are searched recursively. Files it skips are listed
+mailbox exports (`.mbox`), or folders of them. The easiest way to collect reports
+is a mail filter that moves them into one folder, then an export of that folder:
+Gmail through [Google Takeout](https://takeout.google.com/) (pick Mail and the
+label), Thunderbird with the ImportExportTools NG add-on, or Apple Mail's
+Mailbox > Export Mailbox. Comcast's reports come from
+`aprf-noreply@alerts.xfinity.com` with subjects starting `APRF:`. Folders are searched recursively. Files it skips are listed
 on stderr and at the end of the summary, each with a reason.
 
 Each stream (provider, signing domain, selector) gets a table with one row per
@@ -41,7 +47,7 @@ to mark a change in what a category counts.
 
 ## What it does
 
-- Read report files (`.json`, `.json.gz` and `.eml`) or a folder of them, and skip
+- Read report files (`.json`, `.json.gz`, `.eml` and `.mbox`) or a folder of them, and skip
   duplicates and files it cannot read, with a reason for each.
 - Summarise placement per signing domain and selector: inbox, unwanted and
   recipient reactions, by day and as a trend.
