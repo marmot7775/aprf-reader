@@ -87,7 +87,11 @@ function head(page, csp) {
     '<meta property="og:url" content="' + SITE + '">',
     '<meta property="og:title" content="' + attr(TITLE) + '">',
     '<meta property="og:description" content="' + attr(DESCRIPTION) + '">',
-    '<meta name="twitter:card" content="summary">',
+    '<meta property="og:image" content="' + SITE + 'og-card.png">',
+    '<meta property="og:image:width" content="1200">',
+    '<meta property="og:image:height" content="630">',
+    '<meta property="og:image:alt" content="APRF Report Reader: inbox and unwanted counts by day, checked against the draft">',
+    '<meta name="twitter:card" content="summary_large_image">',
     '<script type="application/ld+json">\n' + jsonLd(page) + '\n</script>',
   ].join('\n');
 }
@@ -118,6 +122,8 @@ function build() {
   fs.writeFileSync(path.join(dist, '_headers'), headers(csp));
   fs.writeFileSync(path.join(dist, 'robots.txt'), ROBOTS);
   fs.writeFileSync(path.join(dist, 'sitemap.xml'), sitemap(new Date().toISOString().slice(0, 10)));
+  // The share card; ui/og-card.html is its source, rendered at 1200 by 630
+  fs.copyFileSync(path.join(ROOT, 'ui/og-card.png'), path.join(dist, 'og-card.png'));
   return { bytes: Buffer.byteLength(full), csp };
 }
 
