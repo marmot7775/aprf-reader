@@ -7,3 +7,5 @@ dist/
 reports/
 *.egg-info/
 build/
+.coverage
+coverage.xml

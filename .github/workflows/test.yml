@@ -3,6 +3,10 @@ on: [push, pull_request]
 jobs:
   test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Codecov upload authenticates with GitHub OIDC, so no token secret.
+      id-token: write
     strategy:
       matrix:
         python: ["3.11", "3.13"]
@@ -12,4 +16,12 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
       - run: pip install -e '.[dev]'
-      - run: pytest -q
+      - run: pytest -q --cov=aprf_reader --cov-report=xml
+      - name: Upload coverage to Codecov
+        if: matrix.python == '3.13'
+        uses: codecov/codecov-action@v5
+        with:
+          use_oidc: true
+          files: coverage.xml
+          # A Codecov outage, or the repo not yet switched on there, should not block a merge.
+          fail_ci_if_error: false
