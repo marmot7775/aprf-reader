@@ -7,6 +7,7 @@ edit to this file.
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 
@@ -23,6 +24,14 @@ NO_SDI = ("", "N/A", "N/F")
 def uses_sdi(value: str) -> bool:
     first = value.split(" ", 1)[0].rstrip(";,.").upper()
     return first not in NO_SDI
+
+
+DAY = 86400
+ONE_DAY = "not one UTC day from 00:00:00 to 23:59:59, which draft section 5.1 requires"
+# Placement names section 6 gives as examples; engagement names section 5.2.2 lists
+NAMED_CLASSIFICATION = ("inbox", "unwanted", "forwarded", "promotional")
+# sdi as published in DNS (section 4): a header field name, a comma, one separator character
+SDI_FORMAT = re.compile(r"[!-9;-~]+,\S")
 
 
 class ReportError(ValueError):
@@ -50,6 +59,8 @@ class Report:
     contact_info: str
     extra_info: str
     segments: tuple[Segment, ...]
+    # (warning, detail) where the report departs from the draft but can still be read
+    warnings: tuple[tuple[str, str], ...] = ()
 
     @property
     def day(self) -> date:
@@ -95,23 +106,23 @@ def _int(v: object) -> int | None:
     return v if isinstance(v, int) else None
 
 
-def _counts(value: object, where: str) -> dict[str, int]:
+def _counts(value: object, where: str, section: str) -> dict[str, int]:
     if value is None:
         return {}
     if not isinstance(value, dict):
-        raise ReportError(f"{where} is not an object")
+        raise ReportError(f"{where} is not an object ({section})")
     out = {}
     for name, n in value.items():
         k = _int(n)
         if k is None or k < 0 or k > MAX_COUNT:
-            raise ReportError(f"{where}.{name} is not a count: {json.dumps(n, ensure_ascii=False)}")
+            raise ReportError(f"{where}.{name} is not a count ({section}): {json.dumps(n, ensure_ascii=False, separators=(",", ":"))}")
         out[str(name)] = k
     return out
 
 
 def _segment(item: object, i: int) -> Segment:
     if not isinstance(item, dict):
-        raise ReportError(f"body[{i}] is not an object")
+        raise ReportError(f"body[{i}] is not an object (section 5.2.2)")
     seg = item.get("segment")
     # Section 5.2.2 shows a string, the samples a list
     if seg is None:
@@ -121,11 +132,11 @@ def _segment(item: object, i: int) -> Segment:
     elif isinstance(seg, list) and all(isinstance(s, str) for s in seg):
         path = tuple(seg)
     else:
-        raise ReportError(f"body[{i}].segment is not a string or list of strings")
+        raise ReportError(f"body[{i}].segment is not a string or list of strings (section 5.2.2)")
     return Segment(
         path,
-        _counts(item.get("classification"), f"body[{i}].classification"),
-        _counts(item.get("engagement"), f"body[{i}].engagement"),
+        _counts(item.get("classification"), f"body[{i}].classification", "section 6"),
+        _counts(item.get("engagement"), f"body[{i}].engagement", "section 7"),
     )
 
 
@@ -135,27 +146,30 @@ def _text(value: object) -> str:
 
 def _report(obj: object) -> Report:
     if not isinstance(obj, dict) or not isinstance(obj.get("header"), dict):
-        raise ReportError("no header object")
+        raise ReportError("no header object (section 5.2.1)")
     h = obj["header"]
     for name in ("dkim_domain", "dkim_selector"):
         if not isinstance(h.get(name), str) or not h[name]:
-            raise ReportError(f"header.{name} is missing")
+            raise ReportError(f"header.{name} is missing (section 5.2.1)")
     start, end = _int(h.get("report_start")), _int(h.get("report_end"))
     for name, v in (("report_start", start), ("report_end", end)):
         if v is None:
-            raise ReportError(f"header.{name} is not an epoch time")
+            raise ReportError(f"header.{name} is not an epoch time (section 5.2.1)")
         # Seconds past 1e11 are beyond the year 5138; up to 1e14 that is milliseconds
         if 10**11 <= abs(v) < 10**14:
-            raise ReportError(f"header.{name} looks like milliseconds, not seconds: {v}")
+            raise ReportError(f"header.{name} looks like milliseconds, not epoch seconds (section 5.2.1): {v}")
     if end < start:
-        raise ReportError("header.report_end is before report_start")
+        raise ReportError("header.report_end is before report_start (section 5.1)")
     try:
         _day(end)
     except (OverflowError, OSError, ValueError):
-        raise ReportError(f"header.report_end is out of range: {end}") from None
+        raise ReportError(f"header.report_end is out of range (section 5.2.1): {end}") from None
+    if start % DAY or end != start + DAY - 1:
+        raise ReportError(ONE_DAY)
     body = obj.get("body", [])
     if not isinstance(body, list):
-        raise ReportError("body is not a list")
+        raise ReportError("body is not a list of segments (section 5.2.2)")
+    segments = tuple(_segment(s, i) for i, s in enumerate(body))
     return Report(
         source=_text(h.get("source")) or "unknown",
         dkim_domain=h["dkim_domain"],
@@ -167,17 +181,44 @@ def _report(obj: object) -> Report:
         sdi_used=_text(h.get("sdi_used")).strip(" -"),
         contact_info=_text(h.get("contact_info")),
         extra_info=_text(h.get("extra_info")),
-        segments=tuple(_segment(s, i) for i, s in enumerate(body)),
+        segments=segments,
+        warnings=_warnings(h, segments),
     )
+
+
+def _warnings(h: dict, segments: tuple[Segment, ...]) -> tuple[tuple[str, str], ...]:
+    out = []
+    if "sdi_used" not in h:
+        out.append(("no sdi_used field; section 5.2.1 requires N/A when no SDI is used", ""))
+    else:
+        raw = h["sdi_used"]
+        if not (raw in ("N/A", "N/F") or (isinstance(raw, str) and SDI_FORMAT.fullmatch(raw))):
+            out.append(("sdi_used is not N/A, N/F, or the sdi value as published in DNS (section 5.2.1)",
+                        json.dumps(raw, ensure_ascii=False, separators=(",", ":"))))
+    keys = lambda attr: sorted({k for s in segments for k in getattr(s, attr)})
+    for k in keys("classification"):
+        if k not in NAMED_CLASSIFICATION:
+            out.append((f"classification key {json.dumps(k, ensure_ascii=False)} is not one section 6 names "
+                        "(inbox, unwanted, forwarded, promotional); read as given", ""))
+    for k in keys("engagement"):
+        if k not in ENGAGEMENT_NAMES:
+            out.append((f"engagement key {json.dumps(k, ensure_ascii=False)} is not positive, neutral or "
+                        "negative (section 5.2.2); read as given", ""))
+    return tuple(out)
+
+
+def _no_constant(name: str) -> None:
+    # Python's json takes NaN and Infinity; RFC 8259 and browsers do not
+    raise json.JSONDecodeError(f"{name} is not valid JSON", name, 0)
 
 
 def parse_items(data: bytes) -> list[Report | ReportError]:
     """Each report in a document, or the reason it cannot be read, so one bad
     report does not cost the rest of the file."""
     try:
-        doc = json.loads(data)
+        doc = json.loads(data, parse_constant=_no_constant)
     except (UnicodeDecodeError, json.JSONDecodeError) as e:
-        raise ReportError(f"not JSON: {e}") from None
+        raise ReportError(f"not valid JSON, which section 5 requires: {e}") from None
     except RecursionError:
         raise ReportError("JSON nested too deeply") from None
     items = doc if isinstance(doc, list) else [doc]

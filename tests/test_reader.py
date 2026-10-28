@@ -88,9 +88,12 @@ def test_load_gz_eml_folder_and_skips(tmp_path):
 
     loaded = load([tmp_path])
     assert sorted(r.day.day for r in loaded.reports) == [1, 2, 3]
-    reasons = dict((Path(w.split(" ")[0]).name, r) for w, r in loaded.skipped)
-    assert set(reasons) == {"copy.json", "resend.json", "broken.json"}
-    assert "duplicate" in reasons["copy.json"] and "same day" in reasons["resend.json"]
+    assert [Path(w).name for w, _ in loaded.skipped] == ["broken.json"]
+    assert loaded.copies == 1  # copy.json has a.json's bytes
+    warned = {(w.split(";")[0].split(".")[0], Path(where.split(" ")[0]).name) for w, _, where in loaded.warnings}
+    assert ("the same day came twice from one provider", "resend.json") in warned
+    # The test email is multipart/mixed; its name and subject follow section 8
+    assert {w for w, _, where in loaded.warnings if "c.eml" in where} == {"message Content-Type is not multipart/report (section 8)"}
 
 
 def report_email(day: int, payload: bytes, subtype: str, filename: str | None) -> EmailMessage:
@@ -238,14 +241,25 @@ def test_cli_terminal_when_interactive(monkeypatch, capsys):
 
 def test_stress_set_one_bad_report_does_not_cost_the_file():
     loaded = load([FIX / "stress_100.json"])
-    assert len(loaded.reports) == 88
+    assert len(loaded.reports) == 86
     reasons = {w.rsplit(" ", 1)[-1]: r for w, r in loaded.skipped}
-    assert reasons["73"] == 'body[0].engagement.positive is not a count: "100"'
-    assert reasons["79"] == "header.report_end is before report_start"
+    # s18 spans two days and s19 is shifted an hour: draft section 5.1 requires one UTC day
+    assert "section 5.1" in reasons["77"] and "section 5.1" in reasons["78"]
+    # Same day from the same provider: keep the first, warn, and say how the copy differs
+    dup = {where.rsplit(" ", 1)[-1]: d for w, d, where in loaded.warnings if w.startswith("the same day came twice")}
+    assert dup["64"] == f"{FIX}/stress_100.json report 63 kept, version 1 kept, version 2 dropped"
+    assert dup["69"].endswith("report 68 kept, with different counts")  # bücher.example
+    assert "report 3 kept" in dup["70"]  # DNS-AUDIT.COM / SELECTOR1 is dns-audit.com / selector1
+    assert not {"64", "69", "70"} & set(reasons)
+    warned = {w for w, _, _ in loaded.warnings}
+    assert "sdi_used is not N/A, N/F, or the sdi value as published in DNS (section 5.2.1)" in warned
+    assert any(w.startswith('classification key "spam"') for w in warned)
+    assert not any('"promotional"' in w or '"forwarded"' in w for w in warned)  # section 6 names them
+    assert reasons["73"] == 'body[0].engagement.positive is not a count (section 7): "100"'
+    assert reasons["79"] == "header.report_end is before report_start (section 5.1)"
     assert reasons["81"].startswith("header.report_start looks like milliseconds")
-    assert "report 63" in reasons["64"]  # bücher.example is xn--bcher-kva.example
-    assert "report 3" in reasons["70"]  # DNS-AUDIT.COM / SELECTOR1 is dns-audit.com / selector1
     ss = {(s.source, s.domain, s.selector): s for s in streams(loaded.reports)}
+    assert ("Big MBP Co", "dns-audit.com", "s11") in ss  # another provider, same day: its own stream
     obj = report(0)
     obj["body"][0]["classification"]["unwanted"] = 100.0
     assert parse(json.dumps(obj).encode())[0].segments[0].classification["unwanted"] == 100

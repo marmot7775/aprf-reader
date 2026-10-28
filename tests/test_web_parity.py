@@ -29,7 +29,7 @@ def web(mode: str, paths: list[Path]) -> str:
 
 def same(paths: list[Path]) -> None:
     loaded = load(paths)
-    assert json.loads(web("--json", paths)) == to_dict(loaded.reports, loaded.skipped)
+    assert json.loads(web("--json", paths)) == to_dict(loaded)
     assert web("--md", paths) == to_markdown(loaded)
     assert web("--html", paths) == to_html(loaded)
 
@@ -104,3 +104,27 @@ def test_hostile_text_escaped_the_same(tmp_path):
     obj["body"][0]["classification"][hostile] = 7
     (tmp_path / "h.json").write_text(json.dumps(obj))
     same([tmp_path / "h.json"])
+
+
+def test_section_8_checks_the_same(tmp_path):
+    raw = json.dumps(report(9)).encode()  # 2026-10-10, Example.com, s1, Comcast/Xfinity
+    good = email(raw, "json", "20261010_Example.com_s1_Comcast/Xfinity.json")
+    good.replace_header("Subject", "APRF: 20261010_Example.com_s1_Comcast/Xfinity")
+    good.set_type("multipart/report")
+    safe = email(gzip.compress(json.dumps(report(10)).encode()), "gzip", "20261011_example.com_s1_Comcast-Xfinity.json.gz")
+    safe.replace_header("Subject", "APRF: 20261011_example.com_s1_Comcast-Xfinity")
+    wrong = email(json.dumps(report(11)).encode(), "octet-stream", "report.json")
+    paths = []
+    for name, msg in (("good.eml", good), ("safe.eml", safe), ("wrong.eml", wrong)):
+        (tmp_path / name).write_bytes(msg.as_bytes())
+        paths.append(tmp_path / name)
+    same(paths)
+    loaded = load(paths)
+    by_file = {}
+    for w, _, where in loaded.warnings:
+        by_file.setdefault(Path(where.split(" ")[0]).name, set()).add(w.split(";")[0].split(":")[0].split(" (")[0])
+    # Name, subject and both Content-Types follow section 8; only Comcast's beta sdi_used remains
+    assert by_file["good.eml"] == {"sdi_used is not N/A, N/F, or the sdi value as published in DNS"}
+    assert "attachment name stands in for a character a file name cannot hold, such as / or *" in by_file["safe.eml"]
+    assert {"attachment name does not follow section 8", "subject does not follow section 8",
+            "attachment Content-Type is not application/json, or application/gzip when compressed"} <= by_file["wrong.eml"]

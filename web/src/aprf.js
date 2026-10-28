@@ -26,6 +26,11 @@
     'from any day. Dividing one count by another gives a ratio nobody measured.';
 
   class ReportError extends Error {}
+  // Placement names section 6 gives as examples; engagement names section 5.2.2 lists
+  const NAMED_CLASSIFICATION = ['inbox', 'unwanted', 'forwarded', 'promotional'];
+  // sdi as published in DNS (section 4): a header field name, a comma, one separator character
+  const SDI_FORMAT = /^[!-9;-~]+,\S$/;
+  const ONE_DAY = 'not one UTC day from 00:00:00 to 23:59:59, which draft section 5.1 requires';
 
   // ---- report.py ----
 
@@ -36,55 +41,57 @@
     const d = new Date(epoch * 1000);
     const y = d.getUTCFullYear();
     // Python's date stops at year 9999; match it so both refuse the same files
-    if (isNaN(y) || y < 1 || y > 9999) throw new ReportError('header.report_end is out of range: ' + epoch);
+    if (isNaN(y) || y < 1 || y > 9999) throw new ReportError('header.report_end is out of range (section 5.2.1): ' + epoch);
     return d.toISOString().slice(0, 10);
   }
 
-  function counts(value, where) {
+  function counts(value, where, section) {
     if (value === null || value === undefined) return {};
-    if (typeof value !== 'object' || Array.isArray(value)) throw new ReportError(where + ' is not an object');
+    if (typeof value !== 'object' || Array.isArray(value)) throw new ReportError(where + ' is not an object (' + section + ')');
     const out = {};
     for (const [name, n] of Object.entries(value)) {
-      if (!isInt(n) || n < 0 || n > MAX_COUNT) throw new ReportError(where + '.' + name + ' is not a count: ' + JSON.stringify(n));
+      if (!isInt(n) || n < 0 || n > MAX_COUNT) throw new ReportError(where + '.' + name + ' is not a count (' + section + '): ' + JSON.stringify(n));
       out[name] = n;
     }
     return out;
   }
 
   function segment(item, i) {
-    if (!item || typeof item !== 'object' || Array.isArray(item)) throw new ReportError('body[' + i + '] is not an object');
+    if (!item || typeof item !== 'object' || Array.isArray(item)) throw new ReportError('body[' + i + '] is not an object (section 5.2.2)');
     const seg = item.segment;
     let path;
     // Section 5.2.2 shows a string, the samples a list
     if (seg === null || seg === undefined) path = [];
     else if (typeof seg === 'string') path = [seg];
     else if (Array.isArray(seg) && seg.every((s) => typeof s === 'string')) path = seg.slice();
-    else throw new ReportError('body[' + i + '].segment is not a string or list of strings');
+    else throw new ReportError('body[' + i + '].segment is not a string or list of strings (section 5.2.2)');
     return {
       path,
-      classification: counts(item.classification, 'body[' + i + '].classification'),
-      engagement: counts(item.engagement, 'body[' + i + '].engagement'),
+      classification: counts(item.classification, 'body[' + i + '].classification', 'section 6'),
+      engagement: counts(item.engagement, 'body[' + i + '].engagement', 'section 7'),
     };
   }
 
   function report(obj) {
     if (!obj || typeof obj !== 'object' || Array.isArray(obj) || !obj.header || typeof obj.header !== 'object' || Array.isArray(obj.header)) {
-      throw new ReportError('no header object');
+      throw new ReportError('no header object (section 5.2.1)');
     }
     const h = obj.header;
     for (const name of ['dkim_domain', 'dkim_selector']) {
-      if (typeof h[name] !== 'string' || !h[name]) throw new ReportError('header.' + name + ' is missing');
+      if (typeof h[name] !== 'string' || !h[name]) throw new ReportError('header.' + name + ' is missing (section 5.2.1)');
     }
     for (const name of ['report_start', 'report_end']) {
       const v = h[name];
-      if (!isInt(v)) throw new ReportError('header.' + name + ' is not an epoch time');
+      if (!isInt(v)) throw new ReportError('header.' + name + ' is not an epoch time (section 5.2.1)');
       // Seconds past 1e11 are beyond the year 5138; up to 1e14 that is milliseconds
-      if (Math.abs(v) >= 1e11 && Math.abs(v) < 1e14) throw new ReportError('header.' + name + ' looks like milliseconds, not seconds: ' + v);
+      if (Math.abs(v) >= 1e11 && Math.abs(v) < 1e14) throw new ReportError('header.' + name + ' looks like milliseconds, not epoch seconds (section 5.2.1): ' + v);
     }
-    if (h.report_end < h.report_start) throw new ReportError('header.report_end is before report_start');
+    if (h.report_end < h.report_start) throw new ReportError('header.report_end is before report_start (section 5.1)');
     const day = dayOf(h.report_end);
+    if (h.report_start % 86400 !== 0 || h.report_end !== h.report_start + 86399) throw new ReportError(ONE_DAY);
     const body = obj.body === undefined ? [] : obj.body;
-    if (!Array.isArray(body)) throw new ReportError('body is not a list');
+    if (!Array.isArray(body)) throw new ReportError('body is not a list of segments (section 5.2.2)');
+    const segments = body.map(segment);
     return {
       source: text(h.source) || 'unknown',
       dkim_domain: h.dkim_domain,
@@ -96,7 +103,8 @@
       sdi_used: text(h.sdi_used).replace(/^[ -]+|[ -]+$/g, ''),
       contact_info: text(h.contact_info),
       extra_info: text(h.extra_info),
-      segments: body.map(segment),
+      segments,
+      warnings: reportWarnings(h, segments),
       // Section 8: the report's date is its ending date, in UTC
       day,
     };
@@ -110,6 +118,25 @@
     try { return new URL('http://' + d + '/').hostname; } catch (e) { return d; }
   }
   const streamKey = (r) => [r.source, nameKey(r.dkim_domain), r.dkim_selector.toLowerCase()];
+  function reportWarnings(h, segments) {
+    const out = [];
+    if (!('sdi_used' in h)) out.push(['no sdi_used field; section 5.2.1 requires N/A when no SDI is used', '']);
+    else {
+      const raw = h.sdi_used;
+      if (!(raw === 'N/A' || raw === 'N/F' || (typeof raw === 'string' && SDI_FORMAT.test(raw)))) {
+        out.push(['sdi_used is not N/A, N/F, or the sdi value as published in DNS (section 5.2.1)', JSON.stringify(raw)]);
+      }
+    }
+    const keys = (attr) => [...new Set(segments.flatMap((g) => Object.keys(g[attr])))].sort(cmp);
+    for (const k of keys('classification')) {
+      if (!NAMED_CLASSIFICATION.includes(k)) out.push(['classification key ' + JSON.stringify(k) + ' is not one section 6 names (inbox, unwanted, forwarded, promotional); read as given', '']);
+    }
+    for (const k of keys('engagement')) {
+      if (!ENGAGEMENT_NAMES.includes(k)) out.push(['engagement key ' + JSON.stringify(k) + ' is not positive, neutral or negative (section 5.2.2); read as given', '']);
+    }
+    return out;
+  }
+
   const keyOf = (r) => JSON.stringify(streamKey(r).concat([r.day]));
 
   // Each report in a document, or the reason it cannot be read, so one bad
@@ -119,7 +146,7 @@
     try {
       doc = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
     } catch (e) {
-      throw new ReportError(e instanceof RangeError ? 'JSON nested too deeply' : 'not JSON: ' + e.message);
+      throw new ReportError(e instanceof RangeError ? 'JSON nested too deeply' : 'not valid JSON, which section 5 requires: ' + e.message);
     }
     const items = Array.isArray(doc) ? doc : [doc];
     if (!items.length) throw new ReportError('empty list');
@@ -190,7 +217,7 @@
   }
 
   // One email (as a latin1 string) to its leaf parts, descending into attached emails
-  function mimeParts(raw, out, depth) {
+  function mimeParts(raw, out, depth, owner) {
     if (depth > 20) return out;
     const split = /\r?\n\r?\n/.exec(raw);
     const head = split ? raw.slice(0, split.index) : raw;
@@ -205,6 +232,8 @@
     }
     const ctypeField = fields['content-type'] || 'text/plain';
     const ctype = ctypeField.split(';')[0].trim().toLowerCase() || 'text/plain';
+    // shortcut: subjects are not decoded from RFC 2047 encoded words; a report subject is plain ASCII
+    if (!owner) owner = { subject: (fields.subject || '').split(/\s+/).filter(Boolean).join(' '), ctype };
     const cp = params(ctypeField);
     if (ctype.startsWith('multipart/') && cp.boundary) {
       const esc = cp.boundary.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -220,11 +249,11 @@
       for (let i = 0; i < marks.length; i++) {
         if (marks[i].close) break;
         // No closing delimiter: the last part runs to the end, as Python reads it
-        mimeParts(body.slice(marks[i].end, i + 1 < marks.length ? marks[i + 1].start : body.length), out, depth + 1);
+        mimeParts(body.slice(marks[i].end, i + 1 < marks.length ? marks[i + 1].start : body.length), out, depth + 1, owner);
       }
       return out;
     }
-    if (ctype === 'message/rfc822') return mimeParts(body, out, depth + 1);
+    if (ctype === 'message/rfc822') return mimeParts(body, out, depth + 1, null);
     const disp = fields['content-disposition'] || '';
     const dp = params(disp);
     const enc = (fields['content-transfer-encoding'] || '').trim().toLowerCase();
@@ -233,9 +262,12 @@
       try { data = bytesOf(atob(body.replace(/[^A-Za-z0-9+/=]/g, '').replace(/=+(?=[^=])/g, ''))); } catch (e) { data = new Uint8Array(0); }
     } else if (enc === 'quoted-printable') data = bytesOf(decodeQP(body));
     else data = bytesOf(body);
+    const name = dp.filename || cp.name || '';
     out.push({
-      filename: (dp.filename || cp.name || '').toLowerCase(),
+      name,
+      filename: name.toLowerCase(),
       ctype,
+      owner,
       attachment: disp.split(';')[0].trim().toLowerCase() === 'attachment',
       data,
     });
@@ -245,14 +277,15 @@
   // Yield [label, report JSON bytes] for each report attached to one email
   async function attachments(raw, label) {
     const found = [];
-    for (const p of mimeParts(raw, [], 0)) {
+    for (const p of mimeParts(raw, [], 0, null)) {
       const where = label + ' (' + (p.filename || p.ctype) + ')';
       if (p.data.length > MAX_BYTES) throw new ReportError(where + ' is larger than 10 MB');
+      const mail = (gz) => ({ name: p.name, ctype: p.ctype, gz, subject: p.owner.subject, msgCtype: p.owner.ctype });
       if (p.filename.endsWith('.gz') || p.ctype === 'application/gzip' || p.ctype === 'application/x-gzip' || isGzip(p.data)) {
-        found.push([where, await gunzip(p.data)]);
+        found.push([where, await gunzip(p.data), mail(true)]);
       } else if (p.filename.endsWith('.json') || p.ctype === 'application/json' || (p.attachment && /^\s*[[{]/.test(latin1(p.data.subarray(0, 64))))) {
         // By name or type, or an attachment of unhelpful type that is a JSON array or object
-        found.push([where, p.data]);
+        found.push([where, p.data, mail(false)]);
       }
     }
     return found;
@@ -276,6 +309,50 @@
     });
   }
 
+  // Counts compared without regard to key order, as Python compares dicts
+  const canon = (segs) => JSON.stringify(segs.map((g) => [g.path,
+    ...['classification', 'engagement'].map((a) => Object.keys(g[a]).sort().map((k) => [k, g[a][k]]))]));
+  function differs(kept, dropped) {
+    if (kept.version !== dropped.version) return ', version ' + (kept.version || 'none') + ' kept, version ' + (dropped.version || 'none') + ' dropped';
+    return canon(kept.segments) !== canon(dropped.segments) ? ', with different counts' : ', same counts';
+  }
+
+  const DUPLICATE_DAY = 'the same day came twice from one provider; the first copy read was kept. ' +
+    'The draft leaves this open (a note in section 8.1)';
+  // Characters a file name cannot hold on common systems; "Comcast/Xfinity" and a "*" roll-up
+  // selector both carry one, and section 8 only says to remove spaces
+  const UNSAFE = '/\\:*?"<>|';
+  const NAME_UNSAFE = 'attachment name stands in for a character a file name cannot hold, such as / or *; ' +
+    'section 8 does not say how to write those';
+  const SUBJECT_UNSAFE = 'subject stands in for / or * as a file name must, though section 8 gives the source ' +
+    'and selector as they are';
+  // Python lowercases the same way (str.lower)
+  const fold = (t) => t.toLowerCase();
+  function loose(expected, actual) {
+    const pattern = [...fold(expected)].map((c) => (UNSAFE.includes(c) ? '.' : c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))).join('');
+    return new RegExp('^' + pattern + '$', 'su').test(fold(actual));
+  }
+  // Section 8: the ending date, then domain, selector and source with spaces removed
+  const reportName = (r) => r.day.replace(/-/g, '') + '_' + r.dkim_domain + '_' + r.dkim_selector + '_' + r.source.replace(/ /g, '');
+
+  function mailWarnings(mail, items) {
+    const out = [];
+    if (mail.msgCtype !== 'multipart/report') out.push(['message Content-Type is not multipart/report (section 8)', mail.msgCtype]);
+    const want = mail.gz ? 'application/gzip' : 'application/json';
+    if (mail.ctype !== want) out.push(['attachment Content-Type is not application/json, or application/gzip when compressed (sections 8 and 8.1)', mail.ctype]);
+    if (items.length > 1) out.push(['one attachment holds several reports; the section 8 name and subject fit one', items.length + ' reports']);
+    else if (!(items[0] instanceof ReportError)) {
+      const base = reportName(items[0]);
+      const file = base + (mail.gz ? '.json.gz' : '.json');
+      if (fold(mail.name) === fold(file)) { /* matches */ } else if (loose(file, mail.name)) out.push([NAME_UNSAFE, mail.name + '; section 8 gives ' + file]);
+      else out.push(['attachment name does not follow section 8: <yyyymmdd>_<DKIM domain>_<DKIM selector>_<source>.json', (mail.name || '(none)') + '; expected ' + file]);
+      const subj = 'APRF: ' + base;
+      if (fold(mail.subject) === fold(subj)) { /* matches */ } else if (loose(subj, mail.subject)) out.push([SUBJECT_UNSAFE, mail.subject + '; section 8 gives ' + subj]);
+      else out.push(['subject does not follow section 8: APRF: <yyyymmdd>_<DKIM domain>_<DKIM selector>_<source>', (mail.subject || '(none)') + '; expected ' + subj]);
+    }
+    return out;
+  }
+
   async function sha256(bytes) {
     const subtle = (root.crypto && root.crypto.subtle) || require('crypto').webcrypto.subtle;
     return latin1(new Uint8Array(await subtle.digest('SHA-256', bytes)));
@@ -283,27 +360,38 @@
 
   // files: [{ name, bytes }] in the order to read them. Returns { reports, skipped }.
   async function load(files) {
-    const out = { reports: [], skipped: [] };
-    const seenBytes = new Set();
+    // warnings: [warning, detail, where]; copies: files whose report bytes were already read
+    const out = { reports: [], skipped: [], warnings: [], copies: 0 };
+    const parsed = new Map();
     const seenKeys = new Map();
 
-    async function add(where, data) {
+    async function add(where, data, mail) {
       const digest = await sha256(data);
-      if (seenBytes.has(digest)) { out.skipped.push([where, 'duplicate of a file already read']); return; }
-      seenBytes.add(digest);
-      let items;
-      try { items = parseItems(data); } catch (e) {
-        if (!(e instanceof ReportError)) throw e;
-        out.skipped.push([where, e.message]);
-        return;
+      const copy = parsed.has(digest);
+      if (!copy) {
+        try { parsed.set(digest, parseItems(data)); } catch (e) {
+          if (!(e instanceof ReportError)) throw e;
+          parsed.set(digest, e);
+        }
       }
+      const items = parsed.get(digest);
+      // An email is checked even when its report was already read from another file
+      if (mail && !(items instanceof ReportError)) for (const [w, d] of mailWarnings(mail, items)) out.warnings.push([w, d, where]);
+      if (copy) { out.copies++; return; }
+      if (items instanceof ReportError) { out.skipped.push([where, items.message]); return; }
       items.forEach((r, i) => {
         const label = items.length > 1 ? where + ' report ' + (i + 1) : where;
         if (r instanceof ReportError) { out.skipped.push([label, r.message]); return; }
-        // The draft does not yet say whether a resend replaces the first; keep the first
+        for (const [w, d] of r.warnings) out.warnings.push([w, d, label]);
+        // The draft leaves open whether a resend replaces the first (an open note in
+        // section 8.1), and its version is a free string with no order; keep the first
         const k = keyOf(r);
-        if (seenKeys.has(k)) { out.skipped.push([label, 'same day already reported in ' + seenKeys.get(k) + '; kept that one']); return; }
-        seenKeys.set(k, label);
+        if (seenKeys.has(k)) {
+          const [firstLabel, first] = seenKeys.get(k);
+          out.warnings.push([DUPLICATE_DAY, firstLabel + ' kept' + differs(first, r), label]);
+          return;
+        }
+        seenKeys.set(k, [label, r]);
         out.reports.push(r);
       });
     }
@@ -323,7 +411,7 @@
               continue;
             }
             if (!found.length) without++;
-            for (const [w, d] of found) await add(w, d);
+            for (const [w, d, m] of found) await add(w, d, m);
           }
           if (without) out.skipped.push([name, without + ' message' + (without === 1 ? '' : 's') + ' with no report attached']);
           continue;
@@ -332,10 +420,10 @@
         let payloads;
         if (baseName(name).endsWith('.eml')) {
           payloads = await attachments(latin1(bytes), name);
-          if (!payloads.length) throw new ReportError('no report attachment');
-        } else if (isGzip(bytes)) payloads = [[name, await gunzip(bytes)]];
-        else payloads = [[name, bytes]];
-        for (const [w, d] of payloads) await add(w, d);
+          if (!payloads.length) throw new ReportError('no report attachment, which section 8 calls for');
+        } else if (isGzip(bytes)) payloads = [[name, await gunzip(bytes), null]];
+        else payloads = [[name, bytes, null]];
+        for (const [w, d, m] of payloads) await add(w, d, m);
       } catch (e) {
         if (!(e instanceof ReportError)) throw e;
         out.skipped.push([name, e.message]);
@@ -431,6 +519,19 @@
     }).map((k) => { const [src, dom, sel] = JSON.parse(k); return stream(src, dom, sel, groups.get(k)); });
   }
 
+  // [warning, times, first where, first detail], in the order first seen
+  function grouped(warnings) {
+    const out = new Map();
+    for (const [w, d, where] of warnings) {
+      if (out.has(w)) out.get(w)[1]++;
+      else out.set(w, [w, 1, where, d]);
+    }
+    return [...out.values()];
+  }
+  const copiesLine = (k) => k + ' file' + (k !== 1 ? 's' : '') + ' repeated a report already read, such as the same report saved as .json and as .eml, and counted once.';
+  const WARNINGS_NOTE = 'Read anyway. Each names the draft section it departs from, or the case the draft leaves open.';
+  const warningText = ([w, times, where, detail]) => w + '. ' + times + ' time' + (times === 1 ? '' : 's') + ', first in ' + where + (detail ? ': ' + detail : '');
+
   function toDict(loaded) {
     return {
       reports: loaded.reports.length,
@@ -445,6 +546,8 @@
         changes: s.changes, notes: s.notes,
       })),
       skipped: loaded.skipped.map(([where, reason]) => ({ where, reason })),
+      warnings: grouped(loaded.warnings).map(([warning, times, first, detail]) => ({ warning, times, first, detail })),
+      copies: loaded.copies,
     };
   }
 
@@ -474,7 +577,9 @@
       if (s.changes.length) lines.push('Changes worth a look:', '', ...s.changes.map((c) => '- ' + md(c)), '');
       if (s.notes.length) lines.push(...s.notes.map((t) => '- ' + md(t)), '');
     }
+    if (loaded.warnings.length) lines.push('## Warnings', '', WARNINGS_NOTE, '', ...grouped(loaded.warnings).map((g) => '- ' + md(warningText(g))), '');
     if (loaded.skipped.length) lines.push('## Skipped', '', ...loaded.skipped.map(([w, r]) => '- ' + md(w) + ': ' + md(r)), '');
+    if (loaded.copies) lines.push(copiesLine(loaded.copies), '');
     lines.push('Read by aprf-reader ' + version + ' against ' + DRAFT + '.');
     return lines.join('\n') + '\n';
   }
@@ -537,13 +642,15 @@ tr.gap td{background:var(--gap);color:var(--muted)}tr.trend td{border-bottom:2px
       if (s.changes.length) parts.push('<p>Changes worth a look:</p><ul>' + s.changes.map((c) => '<li>' + esc(c)).join('') + '</ul>');
       if (s.notes.length) parts.push('<ul>' + s.notes.map((t) => '<li>' + esc(t)).join('') + '</ul>');
     }
+    if (loaded.warnings.length) parts.push('<h2>Warnings</h2><p class=muted>' + WARNINGS_NOTE + '</p><ul>' + grouped(loaded.warnings).map((g) => '<li>' + esc(warningText(g))).join('') + '</ul>');
     if (loaded.skipped.length) parts.push('<h2>Skipped</h2><ul>' + loaded.skipped.map(([w, r]) => '<li>' + esc(w) + ': ' + esc(r)).join('') + '</ul>');
+    if (loaded.copies) parts.push('<p class=muted>' + esc(copiesLine(loaded.copies)) + '</p>');
     parts.push('<p class=muted>Read by aprf-reader ' + esc(version) + ' against ' + DRAFT + '. Nothing left this computer.</p>');
     parts.push('</body></html>');
     return parts.join('\n') + '\n';
   }
 
-  const APRF = { DRAFT, CAVEAT, NO_COUNTS, ReportError, parse, load, wanted, streams, toDict, toMarkdown, toHtml, span, rowDay, plural, fmt, addDays, dayOffset: between };
+  const APRF = { DRAFT, CAVEAT, NO_COUNTS, WARNINGS_NOTE, grouped, warningText, copiesLine, ReportError, parse, load, wanted, streams, toDict, toMarkdown, toHtml, span, rowDay, plural, fmt, addDays, dayOffset: between };
   root.APRF = APRF;
   if (typeof module !== 'undefined' && module.exports) module.exports = APRF;
 })(typeof window !== 'undefined' ? window : globalThis);

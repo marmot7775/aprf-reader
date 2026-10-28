@@ -6,6 +6,7 @@ import gzip
 import hashlib
 import io
 import mailbox
+import re
 import zlib
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
@@ -25,6 +26,23 @@ MAX_BYTES = 10 * 1024 * 1024
 class Loaded:
     reports: list[Report] = field(default_factory=list)
     skipped: list[tuple[str, str]] = field(default_factory=list)  # (where, reason)
+    # (warning, detail, where): read, but departs from the draft or meets a case it leaves open
+    warnings: list[tuple[str, str, str]] = field(default_factory=list)
+    # Files whose report bytes were already read, often the same report as .json and .eml
+    copies: int = 0
+
+
+@dataclass(frozen=True)
+class Mail:
+    """How a report arrived by email, for the section 8 checks."""
+    name: str  # attachment file name as sent
+    ctype: str  # attachment Content-Type
+    gz: bool
+    subject: str
+    msg_ctype: str  # Content-Type of the message that carries it
+
+DUPLICATE_DAY = ("the same day came twice from one provider; the first copy read was kept. "
+                 "The draft leaves this open (a note in section 8.1)")
 
 
 def _files(paths: Iterable[Path]) -> Iterator[Path]:
@@ -48,42 +66,54 @@ def _gunzip(data: bytes) -> bytes:
     return out
 
 
-def _attachments(msg: Message, label: str) -> Iterator[tuple[str, bytes]]:
-    """Yield (label, report JSON bytes) for each report attached to one email."""
-    for part in msg.walk():
-        if part.is_multipart():
-            continue
-        fname = (part.get_filename() or "").lower()
+def _leaves(m: Message, owner: Message) -> Iterator[tuple[Message, Message]]:
+    """Each non-multipart part with the email it belongs to; an attached email owns its own parts."""
+    if m.get_content_type() == "message/rfc822":
+        for inner in m.get_payload():
+            yield from _leaves(inner, inner)
+    elif m.is_multipart():
+        for p in m.get_payload():
+            yield from _leaves(p, owner)
+    else:
+        yield m, owner
+
+
+def _attachments(msg: Message, label: str) -> Iterator[tuple[str, bytes, Mail]]:
+    """Yield (label, report JSON bytes, how it arrived) for each report attached to one email."""
+    for part, owner in _leaves(msg, msg):
+        name = part.get_filename() or ""
+        fname = name.lower()
         ctype = part.get_content_type()
         data = part.get_payload(decode=True) or b""
         where = f"{label} ({fname or ctype})"
         if len(data) > MAX_BYTES:
             raise ReportError(f"{where} is larger than 10 MB")
+        mail = lambda gz: Mail(name, ctype, gz, " ".join(str(owner.get("subject", "")).split()), owner.get_content_type())
         if fname.endswith(".gz") or ctype in ("application/gzip", "application/x-gzip") or data[:2] == b"\x1f\x8b":
-            yield where, _gunzip(data)
+            yield where, _gunzip(data), mail(True)
         # By name or type, or an attachment of unhelpful type that is a JSON array or object
         elif fname.endswith(".json") or ctype == "application/json" or (
                 part.get_content_disposition() == "attachment" and data.lstrip()[:1] in (b"[", b"{")):
-            yield where, data
+            yield where, data, mail(False)
 
 
-def _payloads(path: Path) -> Iterator[tuple[str, bytes]]:
-    """Yield (label, report JSON bytes) for each report in a file."""
+def _payloads(path: Path) -> Iterator[tuple[str, bytes, Mail | None]]:
+    """Yield (label, report JSON bytes, how it arrived) for each report in a file."""
     data = path.read_bytes()
     if len(data) > MAX_BYTES:
         raise ReportError("larger than 10 MB")
     if path.name.lower().endswith(".eml"):
         found = list(_attachments(BytesParser(policy=policy.default).parsebytes(data), str(path)))
         if not found:
-            raise ReportError("no report attachment")
+            raise ReportError("no report attachment, which section 8 calls for")
         yield from found
     elif data[:2] == b"\x1f\x8b":
-        yield str(path), _gunzip(data)
+        yield str(path), _gunzip(data), None
     else:
-        yield str(path), data
+        yield str(path), data, None
 
 
-def _mbox(path: Path, out: Loaded) -> Iterator[tuple[str, bytes]]:
+def _mbox(path: Path, out: Loaded) -> Iterator[tuple[str, bytes, Mail | None]]:
     """Yield reports from a mailbox export; one skip line for all mail with none attached."""
     box = mailbox.mbox(path, factory=lambda f: BytesParser(policy=policy.default).parse(f), create=False)
     without = 0
@@ -104,40 +134,108 @@ def _mbox(path: Path, out: Loaded) -> Iterator[tuple[str, bytes]]:
         out.skipped.append((str(path), f"{without} message{'s' if without != 1 else ''} with no report attached"))
 
 
+def _differs(kept: Report, dropped: Report) -> str:
+    if kept.version != dropped.version:
+        return f", version {kept.version or 'none'} kept, version {dropped.version or 'none'} dropped"
+    return ", with different counts" if kept.segments != dropped.segments else ", same counts"
+
+
+def _name(r: Report) -> str:
+    # Section 8: the ending date, then domain, selector and source with spaces removed
+    return f"{r.day:%Y%m%d}_{r.dkim_domain}_{r.dkim_selector}_{r.source.replace(' ', '')}"
+
+
+# Characters a file name cannot hold on common systems; "Comcast/Xfinity" and a "*" roll-up
+# selector both carry one, and section 8 only says to remove spaces
+UNSAFE = '/\\:*?"<>|'
+NAME_UNSAFE = ("attachment name stands in for a character a file name cannot hold, such as / or *; "
+               "section 8 does not say how to write those")
+SUBJECT_UNSAFE = ("subject stands in for / or * as a file name must, though section 8 gives the source "
+                  "and selector as they are")
+
+
+def _loose(expected: str, actual: str) -> bool:
+    """Equal, ignoring case, if each file-name-unsafe character in expected may be any character."""
+    pattern = "".join("." if c in UNSAFE else re.escape(c) for c in expected.lower())
+    return re.fullmatch(pattern, actual.lower()) is not None
+
+
+def _mail_warnings(mail: Mail, items: list) -> list[tuple[str, str]]:
+    out = []
+    if mail.msg_ctype != "multipart/report":
+        out.append(("message Content-Type is not multipart/report (section 8)", mail.msg_ctype))
+    want = "application/gzip" if mail.gz else "application/json"
+    if mail.ctype != want:
+        out.append(("attachment Content-Type is not application/json, or application/gzip when "
+                    "compressed (sections 8 and 8.1)", mail.ctype))
+    if len(items) > 1:
+        out.append(("one attachment holds several reports; the section 8 name and subject fit one", f"{len(items)} reports"))
+    elif isinstance(items[0], Report):
+        base = _name(items[0])
+        file = base + (".json.gz" if mail.gz else ".json")
+        if mail.name.lower() == file.lower():
+            pass
+        elif _loose(file, mail.name):
+            out.append((NAME_UNSAFE, f"{mail.name}; section 8 gives {file}"))
+        else:
+            out.append(("attachment name does not follow section 8: <yyyymmdd>_<DKIM domain>_<DKIM selector>_<source>.json",
+                        f"{mail.name or '(none)'}; expected {file}"))
+        if mail.subject.lower() == f"APRF: {base}".lower():
+            pass
+        elif _loose(f"APRF: {base}", mail.subject):
+            out.append((SUBJECT_UNSAFE, f"{mail.subject}; section 8 gives APRF: {base}"))
+        else:
+            out.append(("subject does not follow section 8: APRF: <yyyymmdd>_<DKIM domain>_<DKIM selector>_<source>",
+                        f"{mail.subject or '(none)'}; expected APRF: {base}"))
+    return out
+
+
 def load(paths: Iterable[Path]) -> Loaded:
     out = Loaded()
     seen_bytes: set[str] = set()
-    seen_keys: dict[tuple, str] = {}
+    seen_keys: dict[tuple, tuple[str, Report]] = {}
 
-    def add(where: str, data: bytes) -> None:
+    parsed: dict[str, list | ReportError] = {}
+
+    def add(where: str, data: bytes, mail: Mail | None) -> None:
         digest = hashlib.sha256(data).hexdigest()
-        if digest in seen_bytes:
-            out.skipped.append((where, "duplicate of a file already read"))
+        copy = digest in parsed
+        if not copy:
+            try:
+                parsed[digest] = parse_items(data)
+            except ReportError as e:
+                parsed[digest] = e
+        items = parsed[digest]
+        # An email is checked even when its report was already read from another file
+        if mail is not None and not isinstance(items, ReportError):
+            out.warnings += [(w, d, where) for w, d in _mail_warnings(mail, items)]
+        if copy:
+            out.copies += 1
             return
-        seen_bytes.add(digest)
-        try:
-            items = parse_items(data)
-        except ReportError as e:
-            out.skipped.append((where, str(e)))
+        if isinstance(items, ReportError):
+            out.skipped.append((where, str(items)))
             return
         for i, r in enumerate(items, 1):
             label = f"{where} report {i}" if len(items) > 1 else where
             if isinstance(r, ReportError):
                 out.skipped.append((label, str(r)))
                 continue
-            # The draft does not yet say whether a resend replaces the first; keep the first
+            out.warnings += [(w, d, label) for w, d in r.warnings]
+            # The draft leaves open whether a resend replaces the first (an open note in
+            # section 8.1), and its version is a free string with no order; keep the first
             if r.key in seen_keys:
-                out.skipped.append((label, f"same day already reported in {seen_keys[r.key]}; kept that one"))
+                first_label, first = seen_keys[r.key]
+                out.warnings.append((DUPLICATE_DAY, f"{first_label} kept{_differs(first, r)}", label))
                 continue
-            seen_keys[r.key] = label
+            seen_keys[r.key] = (label, r)
             out.reports.append(r)
 
     for path in _files(paths):
         try:
             # An mbox can be large, so it is read one message at a time
             payloads = _mbox(path, out) if _is_mbox(path) else list(_payloads(path))
-            for where, data in payloads:
-                add(where, data)
+            for where, data, mail in payloads:
+                add(where, data, mail)
         except (OSError, EOFError, zlib.error, ReportError) as e:
             out.skipped.append((str(path), str(e)))
     return out

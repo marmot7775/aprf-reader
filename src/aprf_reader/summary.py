@@ -119,8 +119,25 @@ def streams(reports: list[Report]) -> list[Stream]:
     return [Stream(src, dom, sel, days) for (src, dom, sel), days in sorted(groups.items())]
 
 
-def to_dict(reports: list[Report], skipped: list[tuple[str, str]]) -> dict:
+def grouped(warnings: list[tuple[str, str, str]]) -> list[tuple[str, int, str, str]]:
+    """(warning, times, first where, first detail), in the order first seen."""
+    out: dict[str, list] = {}
+    for w, d, where in warnings:
+        if w in out:
+            out[w][1] += 1
+        else:
+            out[w] = [w, 1, where, d]
+    return [tuple(v) for v in out.values()]
+
+
+def copies_line(n: int) -> str:
+    return (f"{n} file{'s' if n != 1 else ''} repeated a report already read, such as the same report "
+            "saved as .json and as .eml, and counted once.")
+
+
+def to_dict(loaded) -> dict:
     """The summary as plain data, for --json and for checking the web page against."""
+    reports, skipped = loaded.reports, loaded.skipped
     return {
         "reports": len(reports),
         "streams": [{
@@ -133,4 +150,6 @@ def to_dict(reports: list[Report], skipped: list[tuple[str, str]]) -> dict:
             "changes": s.changes, "notes": s.notes,
         } for s in streams(reports)],
         "skipped": [{"where": w, "reason": r} for w, r in skipped],
+        "warnings": [{"warning": w, "times": n, "first": where, "detail": d} for w, n, where, d in grouped(loaded.warnings)],
+        "copies": loaded.copies,
     }

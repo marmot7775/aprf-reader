@@ -36,7 +36,7 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     if args.json:
-        text = json.dumps(to_dict(loaded.reports, loaded.skipped), indent=2) + "\n"
+        text = json.dumps(to_dict(loaded), indent=2) + "\n"
     elif args.md or args.markdown or not sys.stdout.isatty():
         text = to_markdown(loaded)  # files and pipes get Markdown, which other tools read
     else:

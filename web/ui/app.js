@@ -248,6 +248,25 @@
       h('details', { class: 'table', open: st.rows.length <= 14 }, h('summary', {}, 'Daily table, ' + APRF.plural(st.rows.length, 'row')), h('div', { class: 'tablewrap' }, table)));
   }
 
+  // Warnings and skips as plain lines, each with its draft section, for a review of the draft
+  function reviewText(loaded) {
+    const lines = ['APRF Report Reader ' + VERSION + ', checked against ' + APRF.DRAFT, ''];
+    if (loaded.warnings.length) lines.push('Warnings (read anyway):', ...APRF.grouped(loaded.warnings).map((g) => '- ' + APRF.warningText(g)), '');
+    if (loaded.skipped.length) lines.push('Skipped:', ...loaded.skipped.map(([w, r]) => '- ' + w + ': ' + r), '');
+    return lines.join('\n');
+  }
+
+  function review(loaded) {
+    if (!loaded.warnings.length && !loaded.skipped.length) return null;
+    const groups = APRF.grouped(loaded.warnings);
+    const copyBtn = h('button', { class: 'btn', type: 'button', onclick: (e) => copy(reviewText(loaded), e.currentTarget) }, icon(ICON.copy), h('span', {}, 'Copy for a draft review'));
+    return h('section', { class: 'card skipped' },
+      h('div', { class: 'toolbar' }, h('p', { class: 'eyebrow' }, 'Against the draft'), copyBtn),
+      h('p', { class: 'caveat-note', style: 'margin-top:8px' }, APRF.WARNINGS_NOTE + ' Skipped reports below give the section they break.'),
+      groups.length ? h('ul', {}, groups.map(([w, times, where, detail]) => h('li', {},
+        h('b', {}, w), '. ' + APRF.plural(times, 'time') + ', first in ', h('span', { class: 'mono' }, where), detail ? ': ' + detail : ''))) : h('p', {}, 'No warnings.'));
+  }
+
   function save(name, text, type) {
     const url = URL.createObjectURL(new Blob([text], { type }));
     const a = h('a', { href: url, download: name });
@@ -286,7 +305,9 @@
       sample ? h('p', { class: 'sample-note' }, 'This is made-up sample data for example.com: six weeks, two selectors, two days with no report, and a jump in unwanted mail on Sep 25.') : null,
       h('p', { class: 'caveat-note' }, APRF.CAVEAT),
       ...ss.map(streamCard),
-      loaded.skipped.length ? h('section', { class: 'card skipped' }, h('p', { class: 'eyebrow' }, 'Skipped, ' + loaded.skipped.length), h('ul', {}, loaded.skipped.map(([w, r]) => h('li', {}, h('span', { class: 'mono' }, w), ': ' + r)))) : null);
+      review(loaded),
+      loaded.skipped.length ? h('section', { class: 'card skipped' }, h('p', { class: 'eyebrow' }, 'Skipped, ' + loaded.skipped.length), h('ul', {}, loaded.skipped.map(([w, r]) => h('li', {}, h('span', { class: 'mono' }, w), ': ' + r)))) : null,
+      loaded.copies ? h('p', { class: 'caveat-note' }, APRF.copiesLine(loaded.copies)) : null);
     out.hidden = false;
     $('results-title').focus({ preventScroll: true });
     out.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });

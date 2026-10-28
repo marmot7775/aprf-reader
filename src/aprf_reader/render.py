@@ -9,7 +9,14 @@ from datetime import date
 from . import __version__
 from .load import Loaded
 from .report import DRAFT
-from .summary import Row, Stream, streams
+from .summary import Row, Stream, copies_line, grouped, streams
+
+WARNINGS_NOTE = "Read anyway. Each names the draft section it departs from, or the case the draft leaves open."
+
+
+def _warning(w: str, times: int, where: str, detail: str) -> str:
+    return f"{w}. {_plural(times, 'time')}, first in {where}" + (f": {detail}" if detail else "")
+
 
 NO_COUNTS = "These reports carry no counts."
 
@@ -67,8 +74,12 @@ def to_markdown(loaded: Loaded) -> str:
             lines += ["Changes worth a look:", ""] + [f"- {_md(c)}" for c in s.changes] + [""]
         if s.notes:
             lines += [f"- {_md(n)}" for n in s.notes] + [""]
+    if loaded.warnings:
+        lines += ["## Warnings", "", WARNINGS_NOTE, ""] + [f"- {_md(_warning(*g))}" for g in grouped(loaded.warnings)] + [""]
     if loaded.skipped:
         lines += ["## Skipped", ""] + [f"- {_md(w)}: {_md(r)}" for w, r in loaded.skipped] + [""]
+    if loaded.copies:
+        lines += [copies_line(loaded.copies), ""]
     lines.append(f"Read by aprf-reader {__version__} against {DRAFT}.")
     return "\n".join(lines) + "\n"
 
@@ -134,8 +145,13 @@ def to_html(loaded: Loaded) -> str:
             parts.append("<p>Changes worth a look:</p><ul>" + "".join(f"<li>{e(c)}" for c in s.changes) + "</ul>")
         if s.notes:
             parts.append("<ul>" + "".join(f"<li>{e(n)}" for n in s.notes) + "</ul>")
+    if loaded.warnings:
+        parts.append(f"<h2>Warnings</h2><p class=muted>{WARNINGS_NOTE}</p><ul>"
+                     + "".join(f"<li>{e(_warning(*g))}" for g in grouped(loaded.warnings)) + "</ul>")
     if loaded.skipped:
         parts.append("<h2>Skipped</h2><ul>" + "".join(f"<li>{e(w)}: {e(r)}" for w, r in loaded.skipped) + "</ul>")
+    if loaded.copies:
+        parts.append(f"<p class=muted>{e(copies_line(loaded.copies))}</p>")
     parts.append(f"<p class=muted>Read by aprf-reader {e(__version__)} against {DRAFT}. Nothing left this computer.</p>")
     parts.append("</body></html>")
     return "\n".join(parts) + "\n"
@@ -232,6 +248,14 @@ def to_terminal(loaded: Loaded, color: bool = True, width: int = 100) -> str:
         for n in s.notes:
             out += _wrap(n, width - 4, "  · ")
         out.append("")
+    if loaded.warnings:
+        out.append(st.warn(f"Warnings {len(grouped(loaded.warnings))}"))
+        out += [st.dim(line) for line in _wrap(WARNINGS_NOTE, width - 2, "  ")]
+        for g in grouped(loaded.warnings):
+            out += _wrap(_warning(*g), width - 2, "  ")
+        out.append("")
+    if loaded.copies:
+        out += [st.dim(line) for line in _wrap(copies_line(loaded.copies), width)] + [""]
     if loaded.skipped:
         out.append(st.warn(f"Skipped {len(loaded.skipped)}"))
         for w, r in loaded.skipped:

@@ -11,7 +11,7 @@ Two ways to use it, with the same results:
   your reports on the page. They are read on your computer and never uploaded.
 - **On the command line:** `pipx install aprf-reader`.
 
-**Status: 0.3, beta.** Reads reports in the format of draft-ietf-mailmaint-aprf-00.
+**Status: 0.4, beta.** Reads reports in the format of draft-ietf-mailmaint-aprf-00.
 
 ## What APRF is
 
@@ -75,8 +75,62 @@ to mark a change in what a category counts.
   or share. Nothing is uploaded anywhere.
 - Follow the draft as it changes. The report format lives in one module
   (`src/aprf_reader/report.py`), so a new draft revision is a small update.
-- When the same day arrives twice, keep the first copy and say so. The draft
-  has not yet decided whether a resend replaces the original.
+- Check each report against the draft and skip, with the reason, any it
+  cannot trust. One bad report in a file does not cost the rest of the file.
+
+## Checking against the draft
+
+Every report is checked against draft-ietf-mailmaint-aprf-00, and every
+message names the section, so a list of them can go straight into a review of
+the draft. On the web page, Copy for a draft review copies them as text.
+
+**Skipped**, because the report cannot be trusted:
+
+| Problem | Section |
+|---|---|
+| Not valid JSON | 5 |
+| A required header field missing or of the wrong type; times not in epoch seconds | 5.2.1 |
+| Not one UTC day from 00:00:00 to 23:59:59, or ending before it starts | 5.1 |
+| Body not a list of segments; a segment not an object | 5.2.2 |
+| A placement or engagement count that is not a whole number | 6, 7 |
+| A saved email with no report attached | 8 |
+
+**Warnings**, where the report is still read:
+
+| Warning | Section |
+|---|---|
+| `sdi_used` is not N/A, N/F, or the `sdi` value as published in DNS, or is missing | 5.2.1 |
+| Attachment name or subject not `<yyyymmdd>_<DKIM domain>_<DKIM selector>_<source>` | 8 |
+| Message not `multipart/report`; attachment not `application/json` (or `application/gzip` for `.json.gz`) | 8, 8.1 |
+| One attachment holding several reports | 8 |
+| A placement key other than the four section 6 names, or an engagement key other than positive, neutral and negative | 6, 5.2.2 |
+| A name or subject that writes `/` or `*` some other way, as a file name must | 8 is silent |
+| The same day twice from one provider | left open, note in 8.1 |
+
+Comcast's beta sends `sdi_used` as ` - N/A - Beta - Not in use` and a source
+of `Comcast/Xfinity`, so its reports carry the `sdi_used` warning, and a
+correct file name for them cannot follow section 8 exactly. A file that
+repeats a report already read, such as the same report as `.json` and as
+`.eml`, is counted once and summed up in one line.
+
+## How it decides
+
+- **The same day twice, from the same provider:** it keeps the first copy it
+  reads and skips the other, saying whether the skipped copy had a different
+  `version` or different counts. The draft leaves resends open (a note in
+  section 8.1 asks whether a later report should overwrite or be discarded),
+  and `version` is a free string with no order, so there is no defined way
+  to pick the newer one. Files are read in name order, so the first copy is
+  the first by file name, then by position in the file.
+- **The same day from two providers:** both are kept, as separate streams.
+- **Names:** signing domains and selectors compare without case, and an
+  international domain matches its `xn--` form, so `bücher.example` and
+  `xn--bcher-kva.example` are one stream.
+- **The reporting window:** section 5.1 says a report MUST cover one UTC day,
+  from 00:00:00 to 23:59:59. A report that covers more, or is shifted off the
+  day boundary, is skipped with a reason that names section 5.1.
+- **Counts:** whole numbers only. `100.0` reads as 100; `"100"` and negative
+  numbers are refused.
 
 ## How the web page is built
 
