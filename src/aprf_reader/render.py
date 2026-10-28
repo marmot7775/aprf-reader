@@ -34,7 +34,8 @@ def _counts(loaded: Loaded, ss: list[Stream]) -> str:
 
 def _span(s: Stream) -> str:
     gap = f", {_plural(s.missing, 'day')} with no report" if s.missing else ""
-    return f"{s.first} to {s.last}: {_plural(len(s.by_day), 'report')}{gap}"
+    days = str(s.first) if s.first == s.last else f"{s.first} to {s.last}"
+    return f"{days}: {_plural(len(s.by_day), 'report')}{gap}"
 
 
 def _day(row: Row) -> str:

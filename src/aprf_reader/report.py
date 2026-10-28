@@ -15,7 +15,7 @@ DRAFT = "draft-ietf-mailmaint-aprf-00"
 # Names the draft defines, in display order; providers may add others
 PLACEMENT_NAMES = ("inbox", "unwanted")
 ENGAGEMENT_NAMES = ("positive", "neutral", "negative")
-# sdi_used values that mean no SDI was applied (section 5.2.1)
+# sdi_used values (first word) that mean no SDI was applied (section 5.2.1)
 NO_SDI = ("", "N/A", "N/F")
 
 
@@ -120,7 +120,8 @@ def _report(obj: object) -> Report:
         report_start=h["report_start"],
         report_end=h["report_end"],
         version=_text(h.get("version")),
-        sdi_used=_text(h.get("sdi_used")),
+        # Comcast's beta sends " - N/A - Beta - Not in use"
+        sdi_used=_text(h.get("sdi_used")).strip(" -"),
         contact_info=_text(h.get("contact_info")),
         extra_info=_text(h.get("extra_info")),
         segments=tuple(_segment(s, i) for i, s in enumerate(body)),

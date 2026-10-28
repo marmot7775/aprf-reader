@@ -80,7 +80,8 @@ class Stream:
             prev = r.version
         # "TBD" is the draft samples' placeholder
         out += [f"Provider note: {t}" for t in sorted({r.extra_info for r in self.by_day.values()} - {"", "TBD"})]
-        sdi = sorted({r.sdi_used for r in self.by_day.values()} - set(NO_SDI))
+        sdi = sorted({r.sdi_used for r in self.by_day.values()
+                      if r.sdi_used.split(" ", 1)[0] not in NO_SDI})
         if sdi:
             out.append("SDI used: " + ", ".join(sdi))
         return out

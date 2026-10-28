@@ -39,6 +39,16 @@ def test_draft_samples_parse():
     assert r2.segments[0].path == () and r2.sdi_used == "N/F"
 
 
+def test_comcast_beta_report(tmp_path, capsys):
+    # Shape of a real Comcast beta report as published by Spam Resource, July 2026; domain replaced
+    (r,) = parse((FIX / "comcast_beta.json").read_bytes())
+    assert r.version == "1" and r.sdi_used == "N/A - Beta - Not in use"
+    assert main([str(FIX / "comcast_beta.json")]) == 0
+    out = capsys.readouterr().out
+    assert "2026-07-13: 1 report" in out and " to 2026-07-13" not in out
+    assert "SDI used" not in out
+
+
 def test_bare_object_and_string_segment():
     obj = report(0)
     obj["body"][0]["segment"] = "CustomerA"

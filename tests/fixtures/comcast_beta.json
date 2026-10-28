@@ -1,0 +1,27 @@
+[
+    {
+        "header": {
+            "version": 1,
+            "source": "Comcast/Xfinity",
+            "dkim_domain": "example.com",
+            "dkim_selector": "x",
+            "report_start": 1783900800,
+            "report_end": 1783987199,
+            "contact_info": "aprf-noreply@alerts.xfinity.com",
+            "extra_info": "",
+            "sdi_used": " - N/A - Beta - Not in use"
+        },
+        "body": [
+            {
+                "classification": {
+                    "inbox": 100,
+                    "unwanted": 0
+                },
+                "engagement": {
+                    "positive": 0,
+                    "negative": 0
+                }
+            }
+        ]
+    }
+]
