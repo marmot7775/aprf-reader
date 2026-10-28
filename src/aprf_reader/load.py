@@ -223,7 +223,16 @@ def _mail_warnings(mail: Mail, items: list) -> list[tuple[str, str]]:
     return out
 
 
-def load(paths: Iterable[Path]) -> Loaded:
+def pasted_name(data: bytes) -> str:
+    """A name for pasted text, so it is read like a file: a report's JSON, or a whole
+    email such as Gmail's Show original, attachment and all."""
+    head = data.lstrip()[:1]
+    if head in (b"[", b"{"):
+        return "pasted.json"
+    return "pasted.json.gz" if data[:2] == b"\x1f\x8b" else "pasted.eml"
+
+
+def load(paths: Iterable[Path], pasted: bytes | None = None) -> Loaded:
     out = Loaded()
     seen_bytes: set[str] = set()
     seen_keys: dict[tuple, tuple[str, Report]] = {}
@@ -279,4 +288,11 @@ def load(paths: Iterable[Path]) -> Loaded:
                 add(where, data, mail)
         except (OSError, EOFError, zlib.error, ReportError) as e:
             out.skipped.append((str(path), str(e)))
+    if pasted is not None:
+        name = pasted_name(pasted)
+        try:
+            for where, data, mail in list(_payloads(name, pasted)):
+                add(where, data, mail)
+        except (OSError, EOFError, zlib.error, ReportError) as e:
+            out.skipped.append((name, str(e)))
     return out

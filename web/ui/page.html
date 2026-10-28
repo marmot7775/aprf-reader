@@ -77,8 +77,6 @@ header.top .lede { margin: 0; color: var(--text-2); max-width: 62ch; font-size: 
 .input::before { content: ''; position: absolute; inset: 0 0 auto; height: 2px; background: var(--primary); opacity: 0.6; pointer-events: none; }
 .input-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px; }
 .input-head h2 { font-size: var(--font-md); margin: 0; }
-.privacy { display: inline-flex; align-items: center; gap: 6px; color: var(--pass); font-size: var(--font-sm); font-weight: 500; }
-.privacy svg { width: 14px; height: 14px; flex: none; }
 .drop { display: grid; justify-items: center; gap: 6px; text-align: center; padding: 28px 16px; border: 1.5px dashed var(--border-strong); border-radius: var(--radius); background: var(--code-bg); color: var(--text-2); }
 .drop svg { width: 32px; height: 32px; color: var(--primary); }
 .drop strong { color: var(--text); font-size: var(--font-md); }
@@ -93,6 +91,8 @@ button { font: inherit; cursor: pointer; }
 .btn.primary:hover { background: var(--primary-solid-hover); }
 .btn svg { width: 16px; height: 16px; flex: none; }
 .link-btn { background: none; border: 0; padding: 6px 4px; min-height: 44px; color: var(--primary); font-size: var(--font-sm); font-weight: 500; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--primary-border); }
+.paste summary { cursor: pointer; font-weight: 600; font-size: var(--font-sm); color: var(--primary); min-height: 44px; display: inline-flex; align-items: center; }
+.paste textarea { display: block; width: 100%; margin: 4px 0 8px; font-family: var(--font-mono); font-size: var(--font-sm); line-height: 1.5; border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px; background: var(--code-bg); color: var(--text); resize: vertical; }
 .status { margin: 0; font-size: var(--font-sm); color: var(--text-2); min-height: 1.6em; }
 .status.error { color: var(--caveat); }
 
@@ -190,19 +190,24 @@ tr:last-child td { border-bottom: 0; }
 <main class="wrap" id="main">
   <header class="top">
     <h1>APRF Report Reader <span class="beta">Beta</span></h1>
-    <p class="lede">Comcast now emails senders a daily report on where their mail landed. Drop those reports here to see, day by day, how much reached the inbox, how much was treated as unwanted, and what changed.</p>
+    <p class="lede">See whether your mail reaches the inbox, from the mailbox provider's own numbers. Drop your APRF reports here for the day by day trend and what changed.</p>
   </header>
 
   <section class="card input" id="input" aria-labelledby="input-title">
     <div class="input-head">
       <h2 id="input-title">Your reports</h2>
-      <span class="privacy"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 7V5a3.5 3.5 0 0 1 7 0v2" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="3" y="7" width="10" height="7" rx="1.5" fill="currentColor"/></svg>Read in your browser. Nothing is uploaded.</span>
     </div>
     <div class="drop" id="drop">
       <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 21V7m0 0-5 5m5-5 5 5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 20v4a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
-      <strong>Drop report files or a folder here</strong>
+      <strong>Drop report files or a folder here, or paste</strong>
       <p>Report files (<code>.json</code>, <code>.json.gz</code>), saved report emails (<code>.eml</code>), a mailbox export (<code>.mbox</code>), or a <code>.zip</code> of any of them. Copies are counted once.</p>
     </div>
+    <details class="paste" id="paste">
+      <summary>Paste a report instead</summary>
+      <label for="paste-box" class="sr-only">Report to read</label>
+      <textarea id="paste-box" rows="5" spellcheck="false" placeholder="Paste a report's JSON, or a whole report email. In Gmail: open the email, then More, Show original, Copy to clipboard."></textarea>
+      <button class="btn primary" type="button" id="paste-read">Read it</button>
+    </details>
     <div class="actions">
       <button class="btn primary" type="button" id="pick-files">Choose files</button>
       <button class="btn" type="button" id="pick-folder">Choose a folder</button>
@@ -233,7 +238,6 @@ tr:last-child td { border-bottom: 0; }
       <details><summary>What is a change worth a look?</summary><p>A day when unwanted mail or negative reactions at least doubled and grew by 200 or more, or when inbox mail fell by half and by 200 or more, compared with the report before. Smaller moves are within the rounding, so they are left out.</p></details>
       <details><summary>What do the warnings and skips mean?</summary><p>Every report is checked against the draft, and every message names the section. A report the page cannot trust is skipped: not valid JSON, missing header fields, or not exactly one UTC day as section 5.1 requires. A report that departs from the draft in a smaller way is read with a warning, such as an attachment name that does not follow section 8. If the same provider sends the same day twice, the first copy is kept with a warning, because the draft has not decided which copy should win. Copy for a draft review copies the list as text.</p></details>
       <details><summary>What is a stream?</summary><p>One provider, one signing domain, and one DKIM selector. Reports arrive one per stream per day, so a domain that signs with two selectors gets two streams.</p></details>
-      <details><summary>Is my data uploaded anywhere?</summary><p>No. The files are read by this page in your browser. The page has no server behind it and its security policy blocks every network request it could make, so you can save it and use it offline.</p></details>
       <details><summary>Can I run this on my own computer?</summary><p>Yes. The same reader is a free command line tool, and it gives the same results as this page.</p><pre class="cli">pipx install aprf-reader
 aprf-reader reports/ --html summary.html</pre><p>The source for both is on <a href="https://github.com/marmot7775/aprf-reader">GitHub</a>, and the tool is on <a href="https://pypi.org/project/aprf-reader/">PyPI</a>.</p></details>
     </div>

@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // build.js: inline src and ui into one self-contained page, as the Email
-// Header Decoder does. dist/index.html opens from disk with the network off.
-// Its Content-Security-Policy has no connect-src, so the browser blocks every
-// request the page could make, and script-src allows only the hash of the one
-// inline script. The rest of dist is what the static host serves beside it.
+// Header Decoder does. dist/index.html opens from disk. Its Content-Security-Policy
+// lets the page connect only to dns-audit.com, for the usage note after each use,
+// and script-src allows only the hash of the one inline script. The rest of dist
+// is what the static host serves beside it.
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -12,14 +12,16 @@ const crypto = require('crypto');
 const ROOT = __dirname;
 const REPO = path.join(ROOT, '..');
 const SITE = 'https://aprf.dns-audit.com/';
+// Where the page sends its usage note (POST /api/usage on the dns-audit.com server)
+const USAGE_ORIGIN = 'https://dns-audit.com';
 // Synthetic, never a real report
 const SAMPLE = path.join(REPO, 'tests/fixtures/sample_six_weeks.json');
-const cspFor = (script) => "default-src 'none'; script-src 'sha256-" + crypto.createHash('sha256').update(script, 'utf8').digest('base64') + "'; style-src 'unsafe-inline'; img-src data:; form-action 'none'; base-uri 'none'";
+const cspFor = (script) => "default-src 'none'; script-src 'sha256-" + crypto.createHash('sha256').update(script, 'utf8').digest('base64') + "'; style-src 'unsafe-inline'; img-src data:; connect-src " + USAGE_ORIGIN + "; form-action 'none'; base-uri 'none'";
 // Links the page may carry. A link sends nothing until someone follows it.
 const LINKS = /https?:\/\/(?!dns-audit\.com|headers\.dns-audit\.com|www\.linkedin\.com\/in\/neilanuskiewicz|github\.com\/marmot7775|pypi\.org\/project\/aprf-reader|www\.w3\.org\/2000\/svg)/;
 
-const TITLE = 'APRF Report Reader: read Comcast inbox placement reports';
-const DESCRIPTION = 'Free APRF report reader. Drop the daily placement reports Comcast emails you and see how much mail reached the inbox, how much was unwanted, and what changed. Runs in your browser; nothing is uploaded.';
+const TITLE = 'APRF Report Reader: your inbox placement, from the provider\'s own numbers';
+const DESCRIPTION = 'Free APRF report reader. See whether your mail reaches the inbox, from the mailbox provider\'s own numbers: inbox and unwanted counts day by day, what changed, and a check against the draft standard. Free, no sign-up.';
 const ICON = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#2f5fcc"/><path d="M7 23l6-7 5 4 7-10" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>');
 
 const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
@@ -51,7 +53,7 @@ function jsonLd(page) {
       description: DESCRIPTION,
       applicationCategory: 'BusinessApplication',
       operatingSystem: 'Web',
-      browserRequirements: 'Requires JavaScript. Runs entirely in the browser.',
+      browserRequirements: 'Requires JavaScript.',
       isAccessibleForFree: true,
       offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
       author: { '@id': 'https://dns-audit.com/about#neil' },

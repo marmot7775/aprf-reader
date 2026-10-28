@@ -538,6 +538,15 @@
     return out;
   }
 
+  // A name for pasted text, so it is read like a file: a report's JSON, or a whole
+  // email such as Gmail's Show original, attachment and all (load.py pasted_name)
+  function pastedName(bytes) {
+    let i = 0;
+    while (i < bytes.length && [9, 10, 13, 32].includes(bytes[i])) i++;
+    if (bytes[i] === 0x5b || bytes[i] === 0x7b) return 'pasted.json';
+    return isGzip(bytes) ? 'pasted.json.gz' : 'pasted.eml';
+  }
+
   // ---- summary.py ----
 
   const ms = (day) => Date.parse(day + 'T00:00:00Z');
@@ -756,7 +765,7 @@ tr.gap td{background:var(--gap);color:var(--muted)}tr.trend td{border-bottom:2px
     return parts.join('\n') + '\n';
   }
 
-  const APRF = { DRAFT, CAVEAT, NO_COUNTS, WARNINGS_NOTE, grouped, warningText, copiesLine, ReportError, parse, load, wanted, streams, toDict, toMarkdown, toHtml, span, rowDay, plural, fmt, addDays, dayOffset: between };
+  const APRF = { pastedName, DRAFT, CAVEAT, NO_COUNTS, WARNINGS_NOTE, grouped, warningText, copiesLine, ReportError, parse, load, wanted, streams, toDict, toMarkdown, toHtml, span, rowDay, plural, fmt, addDays, dayOffset: between };
   root.APRF = APRF;
   if (typeof module !== 'undefined' && module.exports) module.exports = APRF;
 })(typeof window !== 'undefined' ? window : globalThis);

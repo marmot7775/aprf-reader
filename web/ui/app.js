@@ -67,9 +67,26 @@
       status('');
       current = { loaded, sample: label === 'sample' };
       render();
+      note(loaded, label === 'sample');
     } catch (e) {
       status('Something went wrong reading those files: ' + e.message, true);
     }
+  }
+
+  // One usage note per run to dns-audit.com, so its owner can see the page is used.
+  // Counts and signing domains only, never report contents (see the privacy page).
+  // text/plain needs no CORS preflight; the reply is not read, and a failure is ignored.
+  function note(loaded, sample) {
+    const ss = APRF.streams(loaded.reports);
+    const domains = [...new Set(ss.map((x) => x.domain))].slice(0, 20);
+    // Where the visitor came from, host only; a link within the site is not a source
+    let ref;
+    try { const h = new URL(document.referrer).hostname; if (h && h !== location.hostname) ref = h; } catch (e) { /* no referrer */ }
+    const body = { tool: 'aprf-reader', reports: loaded.reports.length, streams: ss.length,
+      warnings: loaded.warnings.length, skipped: loaded.skipped.length, copies: loaded.copies, domains, sample, ref };
+    try {
+      fetch('https://dns-audit.com/api/usage', { method: 'POST', mode: 'no-cors', keepalive: true, headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(body) }).catch(() => {});
+    } catch (e) { /* never let the note break the page */ }
   }
 
   // A dropped folder is walked like the command line walks one: report suffixes only
@@ -329,6 +346,20 @@
   $('pick-folder').addEventListener('click', () => $('folder').click());
   $('files').addEventListener('change', (e) => run([...e.target.files].map((file) => ({ name: file.name, file })), 'files'));
   $('folder').addEventListener('change', (e) => run([...e.target.files].filter((f) => APRF.wanted(f.name)).map((file) => ({ name: file.webkitRelativePath || file.name, file })), 'folder'));
+  // A paste is read like a file named by what it looks like: JSON, or a whole email
+  const pasted = (text) => {
+    const bytes = new TextEncoder().encode(text);
+    run([{ name: APRF.pastedName(bytes), file: new Blob([bytes]) }], 'paste');
+  };
+  $('paste-read').addEventListener('click', () => { if ($('paste-box').value.trim()) pasted($('paste-box').value); });
+  // Ctrl+V or Cmd+V anywhere on the page reads what was copied, text or files
+  document.addEventListener('paste', (e) => {
+    if (e.target.closest && e.target.closest('textarea, input')) return;
+    const files = [...(e.clipboardData && e.clipboardData.files || [])];
+    const text = e.clipboardData ? e.clipboardData.getData('text') : '';
+    if (files.length) { e.preventDefault(); run(files.map((file) => ({ name: file.name, file })), 'paste'); }
+    else if (text.trim()) { e.preventDefault(); pasted(text); }
+  });
   $('sample').addEventListener('click', () => run([{ name: 'sample.json', file: new Blob([window.APRF_SAMPLE]) }], 'sample'));
 
   const zone = $('input');
