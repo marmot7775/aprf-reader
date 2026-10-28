@@ -21,7 +21,7 @@ const cspFor = (script) => "default-src 'none'; script-src 'sha256-" + crypto.cr
 const LINKS = /https?:\/\/(?!dns-audit\.com|headers\.dns-audit\.com|www\.linkedin\.com\/in\/neilanuskiewicz|github\.com\/marmot7775|pypi\.org\/project\/aprf-reader|www\.w3\.org\/2000\/svg)/;
 
 const TITLE = 'APRF Report Reader: your inbox placement, from the provider\'s own numbers';
-const DESCRIPTION = 'Free APRF report reader. See whether your mail reaches the inbox, from the mailbox provider\'s own numbers: inbox and unwanted counts day by day, what changed, and a check against the draft standard. No sign-up, and your report files are not uploaded.';
+const DESCRIPTION = 'Free APRF report reader. See whether your mail reaches the inbox, from the mailbox provider\'s own numbers: inbox and unwanted counts day by day, what changed, and a check against the draft standard. Free, no sign-up.';
 const ICON = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#2f5fcc"/><path d="M7 23l6-7 5 4 7-10" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>');
 
 const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
@@ -53,7 +53,7 @@ function jsonLd(page) {
       description: DESCRIPTION,
       applicationCategory: 'BusinessApplication',
       operatingSystem: 'Web',
-      browserRequirements: 'Requires JavaScript. Runs entirely in the browser.',
+      browserRequirements: 'Requires JavaScript.',
       isAccessibleForFree: true,
       offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
       author: { '@id': 'https://dns-audit.com/about#neil' },

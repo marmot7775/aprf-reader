@@ -7,9 +7,8 @@ points out the days worth a look, such as a jump in unwanted mail.
 
 Two ways to use it, with the same results:
 
-- **In your browser:** [aprf.dns-audit.com](https://aprf.dns-audit.com). Drop
-  your reports on the page. They are read in your browser, not uploaded. The
-  page sends dns-audit.com a one-line usage note: counts and signing domains.
+- **On the web:** [aprf.dns-audit.com](https://aprf.dns-audit.com). Drop or
+  paste your reports on the page.
 - **On the command line:** `pipx install aprf-reader`.
 
 **Status: 0.5, beta.** Reads reports in the format of draft-ietf-mailmaint-aprf-00.
