@@ -1,0 +1,247 @@
+<title>APRF Report Reader</title>
+<style>
+/* One reading column, phone first. Palette and type are dns-audit.com's
+   tokens, as on the Email Header Decoder, dark first like the site. No web
+   fonts: the page makes no requests, so the stacks are system ones. */
+:root {
+  color-scheme: dark;
+  --bg: #0b1220; --raised: #111a2e; --surface: #141d31; --surface-hover: #1a2540; --code-bg: #0b1220;
+  --border: #263149; --border-strong: #3a4763;
+  --text: #eef2f8; --text-2: #a3b0c4; --muted: #8e9bb0;
+  --primary: #5b8def; --primary-solid: #2f5fcc; --primary-solid-hover: #274fa8;
+  --primary-subtle: rgba(91, 141, 239, 0.14); --primary-border: rgba(91, 141, 239, 0.28);
+  --on-solid: #ffffff;
+  --pass: #34c07a; --pass-bg: rgba(52, 192, 122, 0.10); --pass-border: rgba(52, 192, 122, 0.28);
+  --caveat: #e0a43c; --caveat-bg: rgba(224, 164, 60, 0.10); --caveat-border: rgba(224, 164, 60, 0.28);
+  --gap-fill: rgba(152, 165, 185, 0.10);
+  --font-body: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  --font-xs: 0.75rem; --font-sm: 0.8125rem; --font-base: 0.9375rem; --font-md: 1rem; --font-lg: 1.125rem; --font-xl: 1.25rem; --font-3xl: 1.75rem;
+  --radius-sm: 4px; --radius: 8px; --radius-lg: 12px;
+  --max-width: 960px;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    color-scheme: light;
+    --bg: #f4f6f9; --raised: #ffffff; --surface: #ffffff; --surface-hover: #eef1f6; --code-bg: #f8f9fb;
+    --border: #dfe4ec; --border-strong: #9aa7b8;
+    --text: #101828; --text-2: #475467; --muted: #5a6678;
+    --primary: #2f5fcc; --primary-solid: #2f5fcc; --primary-solid-hover: #274fa8; --primary-subtle: rgba(47, 95, 204, 0.08); --primary-border: rgba(47, 95, 204, 0.22);
+    --pass: #177245; --pass-bg: rgba(23, 114, 69, 0.07); --pass-border: rgba(23, 114, 69, 0.22);
+    --caveat: #9a5a10; --caveat-bg: rgba(154, 90, 16, 0.08); --caveat-border: rgba(154, 90, 16, 0.22);
+    --gap-fill: rgba(90, 102, 120, 0.08);
+  }
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f4f6f9; --raised: #ffffff; --surface: #ffffff; --surface-hover: #eef1f6; --code-bg: #f8f9fb;
+  --border: #dfe4ec; --border-strong: #9aa7b8;
+  --text: #101828; --text-2: #475467; --muted: #5a6678;
+  --primary: #2f5fcc; --primary-solid: #2f5fcc; --primary-solid-hover: #274fa8; --primary-subtle: rgba(47, 95, 204, 0.08); --primary-border: rgba(47, 95, 204, 0.22);
+  --pass: #177245; --pass-bg: rgba(23, 114, 69, 0.07); --pass-border: rgba(23, 114, 69, 0.22);
+  --caveat: #9a5a10; --caveat-bg: rgba(154, 90, 16, 0.08); --caveat-border: rgba(154, 90, 16, 0.22);
+  --gap-fill: rgba(90, 102, 120, 0.08);
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font-body); font-size: var(--font-base); line-height: 1.6; -webkit-font-smoothing: antialiased; }
+.site-bar-in, main.wrap, .site-foot-in { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+main.wrap { padding-block: 28px 48px; }
+[hidden] { display: none !important; }
+.wrap { max-width: var(--max-width); margin: 0 auto; display: grid; gap: 16px; min-width: 0; }
+:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: var(--radius-sm); }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.mono, code { font-family: var(--font-mono); font-size: var(--font-sm); }
+a { color: var(--primary); text-underline-offset: 3px; text-decoration-color: var(--primary-border); }
+
+/* Site bar: the same wordmark and links as dns-audit.com */
+.site-bar { border-bottom: 1px solid var(--border); background: var(--raised); }
+.site-bar-in { max-width: var(--max-width); margin: 0 auto; min-height: 56px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 16px; }
+.logo { color: var(--text); text-decoration: none; font-weight: 700; font-size: var(--font-lg); letter-spacing: -0.01em; display: inline-flex; align-items: center; min-height: 44px; }
+.logo .accent { color: var(--primary); }
+.site-bar nav { display: flex; flex-wrap: wrap; gap: 2px; margin-inline: -8px; }
+.site-bar nav a { color: var(--text-2); text-decoration: none; font-size: var(--font-sm); font-weight: 500; padding: 0 8px; min-height: 44px; display: inline-flex; align-items: center; border-radius: var(--radius); }
+.site-bar nav a:hover { color: var(--text); background: var(--surface-hover); }
+.site-bar nav a[aria-current="page"] { color: var(--text); box-shadow: inset 0 -2px 0 var(--primary); border-radius: 0; }
+
+header.top { display: grid; gap: 8px; }
+header.top h1 { font-size: var(--font-3xl); font-weight: 700; letter-spacing: -0.02em; margin: 0; line-height: 1.2; text-wrap: balance; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+header.top .lede { margin: 0; color: var(--text-2); max-width: 62ch; font-size: var(--font-md); }
+.beta { display: inline-flex; align-items: center; font-size: var(--font-xs); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--caveat); border: 1px solid var(--caveat-border); background: var(--caveat-bg); border-radius: 999px; padding: 3px 9px; line-height: 1.2; }
+
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px; min-width: 0; }
+.eyebrow { font-size: var(--font-xs); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 0; }
+
+/* Drop zone */
+.input { position: relative; overflow: hidden; display: grid; gap: 12px; }
+.input::before { content: ''; position: absolute; inset: 0 0 auto; height: 2px; background: var(--primary); opacity: 0.6; pointer-events: none; }
+.input-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px; }
+.input-head h2 { font-size: var(--font-md); margin: 0; }
+.privacy { display: inline-flex; align-items: center; gap: 6px; color: var(--pass); font-size: var(--font-sm); font-weight: 500; }
+.privacy svg { width: 14px; height: 14px; flex: none; }
+.drop { display: grid; justify-items: center; gap: 6px; text-align: center; padding: 28px 16px; border: 1.5px dashed var(--border-strong); border-radius: var(--radius); background: var(--code-bg); color: var(--text-2); }
+.drop svg { width: 32px; height: 32px; color: var(--primary); }
+.drop strong { color: var(--text); font-size: var(--font-md); }
+.drop p { margin: 0; font-size: var(--font-sm); max-width: 52ch; }
+.input.over .drop { border-color: var(--primary); background: var(--primary-subtle); }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.actions .spacer { flex: 1 1 auto; }
+button { font: inherit; cursor: pointer; }
+.btn { font-weight: 600; font-size: var(--font-sm); border-radius: var(--radius); border: 1px solid var(--border-strong); background: transparent; color: var(--text); padding: 8px 14px; min-height: 44px; display: inline-flex; align-items: center; gap: 6px; }
+.btn:hover { background: var(--surface-hover); }
+.btn.primary { background: var(--primary-solid); border-color: var(--primary-solid); color: var(--on-solid); }
+.btn.primary:hover { background: var(--primary-solid-hover); }
+.btn svg { width: 16px; height: 16px; flex: none; }
+.link-btn { background: none; border: 0; padding: 6px 4px; min-height: 44px; color: var(--primary); font-size: var(--font-sm); font-weight: 500; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--primary-border); }
+.status { margin: 0; font-size: var(--font-sm); color: var(--text-2); min-height: 1.6em; }
+.status.error { color: var(--caveat); }
+
+/* Results */
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
+.toolbar h2 { margin: 0; font-size: var(--font-xl); letter-spacing: -0.01em; }
+.toolbar p { margin: 2px 0 0; color: var(--text-2); font-size: var(--font-sm); }
+.caveat-note { margin: 0; font-size: var(--font-sm); color: var(--text-2); border-left: 3px solid var(--primary-border); padding: 2px 0 2px 12px; max-width: 80ch; }
+.sample-note { margin: 0; font-size: var(--font-sm); color: var(--caveat); }
+
+.stream { display: grid; gap: 16px; }
+.stream-head h3 { margin: 0; font-size: var(--font-xl); letter-spacing: -0.01em; overflow-wrap: anywhere; }
+.stream-head h3 .sel { color: var(--text-2); font-weight: 500; }
+.stream-head .meta { margin: 4px 0 0; display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: var(--font-sm); color: var(--text-2); }
+.stream-head .meta .gapcount { color: var(--caveat); }
+
+.charts { display: grid; grid-template-columns: 1fr; gap: 12px; }
+@media (min-width: 640px) { .charts { grid-template-columns: 1fr 1fr; } }
+.chart { border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; background: var(--raised); min-width: 0; position: relative; }
+.chart .name { font-size: var(--font-xs); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 0; }
+.chart .latest { margin: 2px 0 0; font-size: var(--font-3xl); font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.chart .latest small { font-size: var(--font-sm); font-weight: 500; color: var(--text-2); letter-spacing: 0; }
+.chart .sub { margin: 0 0 6px; font-size: var(--font-xs); color: var(--muted); }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; touch-action: pan-y; }
+.chart .axis { fill: var(--muted); font-size: 10px; font-family: var(--font-body); }
+.chart .grid { stroke: var(--border); stroke-width: 1; }
+.chart .line { fill: none; stroke: var(--primary); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.chart .area { fill: var(--primary-subtle); }
+.chart .gapband { fill: var(--gap-fill); }
+.chart .flag { fill: var(--surface); stroke: var(--caveat); stroke-width: 2; }
+.chart .dot { fill: var(--primary); stroke: var(--raised); stroke-width: 2; }
+.chart .cross { stroke: var(--border-strong); stroke-width: 1; }
+.tip { position: absolute; z-index: 2; pointer-events: none; background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius); padding: 6px 10px; font-size: var(--font-sm); white-space: nowrap; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25); }
+.tip b { font-variant-numeric: tabular-nums; }
+.tip span { display: block; color: var(--text-2); font-size: var(--font-xs); }
+
+.changes { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.changes li { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start; font-size: var(--font-sm); }
+.chip { display: inline-flex; align-items: center; gap: 5px; font-size: var(--font-xs); font-weight: 600; line-height: 1; padding: 4px 8px; border-radius: 999px; border: 1px solid; white-space: nowrap; }
+.chip.look { color: var(--caveat); background: var(--caveat-bg); border-color: var(--caveat-border); }
+.chip.ok { color: var(--pass); background: var(--pass-bg); border-color: var(--pass-border); }
+.chip svg { width: 12px; height: 12px; }
+.notes { margin: 0; padding-left: 20px; font-size: var(--font-sm); color: var(--text-2); }
+
+details.table > summary { cursor: pointer; font-weight: 600; font-size: var(--font-sm); min-height: 44px; display: flex; align-items: center; }
+.tablewrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); }
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; font-size: var(--font-sm); }
+th, td { border-bottom: 1px solid var(--border); padding: 6px 10px; text-align: right; white-space: nowrap; }
+th { color: var(--muted); font-weight: 600; font-size: var(--font-xs); text-transform: uppercase; letter-spacing: 0.06em; position: sticky; top: 0; background: var(--surface); }
+th:nth-child(-n+2), td:nth-child(-n+2) { text-align: left; }
+tr.gaprow td { background: var(--gap-fill); color: var(--muted); font-style: italic; }
+tr:last-child td { border-bottom: 0; }
+
+.skipped ul { margin: 8px 0 0; padding-left: 20px; font-size: var(--font-sm); color: var(--text-2); overflow-wrap: anywhere; }
+
+/* Guide */
+.guide h2 { font-size: var(--font-xl); margin: 8px 0 0; }
+.steps { margin: 0; padding-left: 22px; display: grid; gap: 8px; }
+.steps code, .faq code { background: var(--code-bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 1px 5px; overflow-wrap: anywhere; }
+.faq { display: grid; gap: 8px; }
+.faq details { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 0 14px; }
+.faq summary { cursor: pointer; font-weight: 600; min-height: 44px; display: flex; align-items: center; }
+.faq p { margin: 0 0 12px; color: var(--text-2); }
+.cli { font-family: var(--font-mono); font-size: var(--font-sm); background: var(--code-bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px; overflow-x: auto; white-space: pre; margin: 0 0 12px; color: var(--text); }
+
+.site-foot { border-top: 1px solid var(--border); background: var(--raised); color: var(--text-2); font-size: var(--font-sm); }
+.site-foot-in { max-width: var(--max-width); margin: 0 auto; padding-block: 24px calc(32px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 10px; }
+.site-foot p { margin: 0; max-width: 76ch; }
+.foot-links { display: flex; flex-wrap: wrap; gap: 4px 16px; }
+
+@media (forced-colors: active) {
+  .chart .line { stroke: CanvasText; } .chart .flag { stroke: Highlight; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .results-enter { animation: rise 0.25s ease-out; }
+  @keyframes rise { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+}
+</style>
+
+<header class="site-bar">
+  <div class="site-bar-in">
+    <a class="logo" href="https://dns-audit.com/"><span>dns<span class="accent">-audit</span>.com</span></a>
+    <nav aria-label="dns-audit.com">
+      <a href="https://dns-audit.com/">DNS audit</a>
+      <a href="https://headers.dns-audit.com/">Header Decoder</a>
+      <a href="./" aria-current="page">APRF Reader</a>
+      <a href="https://dns-audit.com/articles/">Articles</a>
+      <a href="https://dns-audit.com/about">About</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap" id="main">
+  <header class="top">
+    <h1>APRF Report Reader <span class="beta">Beta</span></h1>
+    <p class="lede">Comcast now emails senders a daily report on where their mail landed. Drop those reports here to see, day by day, how much reached the inbox, how much was treated as unwanted, and what changed.</p>
+  </header>
+
+  <section class="card input" id="input" aria-labelledby="input-title">
+    <div class="input-head">
+      <h2 id="input-title">Your reports</h2>
+      <span class="privacy"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 7V5a3.5 3.5 0 0 1 7 0v2" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="3" y="7" width="10" height="7" rx="1.5" fill="currentColor"/></svg>Read in your browser. Nothing is uploaded.</span>
+    </div>
+    <div class="drop" id="drop">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 21V7m0 0-5 5m5-5 5 5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 20v4a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+      <strong>Drop report files or a folder here</strong>
+      <p>Report files (<code>.json</code>, <code>.json.gz</code>), saved report emails (<code>.eml</code>), or a mailbox export (<code>.mbox</code>). Duplicates are skipped.</p>
+    </div>
+    <div class="actions">
+      <button class="btn primary" type="button" id="pick-files">Choose files</button>
+      <button class="btn" type="button" id="pick-folder">Choose a folder</button>
+      <span class="spacer"></span>
+      <button class="link-btn" type="button" id="sample">Try a sample</button>
+    </div>
+    <input type="file" id="files" multiple hidden accept=".json,.gz,.eml,.mbox,application/json,application/gzip,message/rfc822">
+    <input type="file" id="folder" webkitdirectory multiple hidden>
+    <p class="status" id="status" role="status" aria-live="polite" hidden></p>
+  </section>
+
+  <section id="results" class="wrap" hidden aria-labelledby="results-title"></section>
+
+  <section class="guide wrap" aria-labelledby="guide-title">
+    <h2 id="guide-title">Getting reports</h2>
+    <ol class="steps">
+      <li>Publish one DNS record for the domain your mail is signed with. Your DNS host adds it as a TXT record named <code>_aprf._domainkey</code>, with the value <code>v=APRFv1; rua=mailto:reports@yourdomain.com</code>, using an address you read.</li>
+      <li>Send as usual. Comcast emails one report a day for each signing domain and DKIM selector that sent to its users, from <code>aprf-noreply@alerts.xfinity.com</code>, with subjects starting <code>APRF:</code>.</li>
+      <li>Filter those emails into one folder. Drop the attachments here, the saved emails, or the whole folder exported as an mbox file.</li>
+    </ol>
+    <p>Not sure your record is right? <a href="https://dns-audit.com/">dns-audit.com</a> checks it along with SPF, DKIM and DMARC.</p>
+
+    <h2>Questions</h2>
+    <div class="faq">
+      <details><summary>What is APRF?</summary><p>Aggregate Performance Reporting is a draft standard from the IETF's Mail Maintenance working group. A mailbox provider sends you a daily summary of how its users received mail signed with your domain: how much went to the inbox, how much it treated as unwanted, and how people reacted. Comcast sends reports today as a beta. <a href="https://dns-audit.com/articles/aprf">Read the plain-language introduction</a>.</p></details>
+      <details><summary>Why are there no percentages?</summary><p>Each count is a bucket ceiling, not an exact figure. Comcast's counts come in steps of 100, and 700 means up to 700. Placement counts mail received that day, while engagement counts actions taken that day on mail from any day. Dividing one by another gives a ratio nobody measured, so this page shows the counts and how they move.</p></details>
+      <details><summary>What does unwanted mean?</summary><p>Mail the provider put somewhere other than the inbox, usually the spam folder. Each provider decides what it counts. When a report's version number changes, the page says so, because the provider may have changed what a category means.</p></details>
+      <details><summary>What is a change worth a look?</summary><p>A day when unwanted mail or negative reactions at least doubled and grew by 200 or more, or when inbox mail fell by half and by 200 or more, compared with the report before. Smaller moves are within the rounding, so they are left out.</p></details>
+      <details><summary>What is a stream?</summary><p>One provider, one signing domain, and one DKIM selector. Reports arrive one per stream per day, so a domain that signs with two selectors gets two streams.</p></details>
+      <details><summary>Is my data uploaded anywhere?</summary><p>No. The files are read by this page in your browser. The page has no server behind it and its security policy blocks every network request it could make, so you can save it and use it offline.</p></details>
+      <details><summary>Can I run this on my own computer?</summary><p>Yes. The same reader is a free command line tool, and it gives the same results as this page.</p><pre class="cli">pipx install aprf-reader
+aprf-reader reports/ --html summary.html</pre><p>The source for both is on <a href="https://github.com/marmot7775/aprf-reader">GitHub</a>, and the tool is on <a href="https://pypi.org/project/aprf-reader/">PyPI</a>.</p></details>
+    </div>
+  </section>
+</main>
+
+<footer class="site-foot">
+  <div class="site-foot-in">
+    <p><span class="beta">Beta</span> Did it read a report wrong? Email <a href="mailto:dns@dns-audit.com">dns@dns-audit.com</a> or open an issue on GitHub.</p>
+    <p>Built by <a href="https://dns-audit.com/about">Neil Anuskiewicz</a>, an email deliverability and DNS consultant.</p>
+    <p class="foot-links"><a href="https://dns-audit.com/">dns-audit.com</a><a href="https://headers.dns-audit.com/">Header Decoder</a><a href="https://dns-audit.com/articles/">Articles</a><a href="https://www.linkedin.com/in/neilanuskiewicz/" rel="noopener">LinkedIn</a><a href="https://github.com/marmot7775/aprf-reader" rel="noopener">Source on GitHub</a></p>
+  </div>
+</footer>
+<!-- SCRIPTS -->

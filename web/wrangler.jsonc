@@ -1,0 +1,11 @@
+// Static hosting on Cloudflare: web/dist as Workers static assets on
+// aprf.dns-audit.com. No Worker script; the host only serves files.
+// workers.dev and preview URLs are off so search engines see one copy.
+{
+  "name": "aprf-reader",
+  "compatibility_date": "2026-10-01",
+  "assets": { "directory": "./dist", "html_handling": "auto-trailing-slash", "not_found_handling": "none" },
+  "routes": [{ "pattern": "aprf.dns-audit.com", "custom_domain": true }],
+  "workers_dev": false,
+  "preview_urls": false
+}

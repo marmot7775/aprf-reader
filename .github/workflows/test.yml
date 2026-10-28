@@ -1,5 +1,11 @@
 name: test
 on: [push, pull_request]
+
+# One deploy at a time; a newer merge waits for the running one.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -15,8 +21,13 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
+      # The parity tests run the web page's reader under Node
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
       - run: pip install -e '.[dev]'
       - run: pytest -q --cov=aprf_reader --cov-report=xml
+      - run: node web/build.js
       - name: Upload coverage to Codecov
         if: matrix.python == '3.13'
         uses: codecov/codecov-action@v5
@@ -25,3 +36,30 @@ jobs:
           files: coverage.xml
           # A Codecov outage, or the repo not yet switched on there, should not block a merge.
           fail_ci_if_error: false
+
+  # Deploys the web page to aprf.dns-audit.com after the tests pass on main.
+  # Needs the repository secret CLOUDFLARE_API_TOKEN and the repository
+  # variable CLOUDFLARE_ACCOUNT_ID.
+  deploy:
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node web/build.js
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: "4.86.0"
+          workingDirectory: web
+          command: deploy
+      - name: Check the live page
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"/\1/p' pyproject.toml)
+          curl -sf https://aprf.dns-audit.com/ | grep -q "APRF_VERSION = \"$version\""

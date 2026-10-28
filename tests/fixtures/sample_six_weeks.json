@@ -1,0 +1,2002 @@
+[
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "news",
+   "report_start": 1788220800,
+   "report_end": 1788307199,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 4100,
+     "unwanted": 300
+    },
+    "engagement": {
+     "positive": 700,
+     "negative": 100
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "receipts",
+   "report_start": 1788220800,
+   "report_end": 1788307199,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 800,
+     "unwanted": 0
+    },
+    "engagement": {
+     "positive": 100,
+     "negative": 0
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "news",
+   "report_start": 1788307200,
+   "report_end": 1788393599,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 4000,
+     "unwanted": 300
+    },
+    "engagement": {
+     "positive": 700,
+     "negative": 100
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "receipts",
+   "report_start": 1788307200,
+   "report_end": 1788393599,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 800,
+     "unwanted": 0
+    },
+    "engagement": {
+     "positive": 100,
+     "negative": 0
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "news",
+   "report_start": 1788393600,
+   "report_end": 1788479999,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 4100,
+     "unwanted": 300
+    },
+    "engagement": {
+     "positive": 500,
+     "negative": 100
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "receipts",
+   "report_start": 1788393600,
+   "report_end": 1788479999,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 1000,
+     "unwanted": 0
+    },
+    "engagement": {
+     "positive": 100,
+     "negative": 0
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "news",
+   "report_start": 1788480000,
+   "report_end": 1788566399,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 4100,
+     "unwanted": 200
+    },
+    "engagement": {
+     "positive": 500,
+     "negative": 100
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "receipts",
+   "report_start": 1788480000,
+   "report_end": 1788566399,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 1000,
+     "unwanted": 0
+    },
+    "engagement": {
+     "positive": 100,
+     "negative": 0
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "news",
+   "report_start": 1788566400,
+   "report_end": 1788652799,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 2600,
+     "unwanted": 200
+    },
+    "engagement": {
+     "positive": 600,
+     "negative": 100
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "receipts",
+   "report_start": 1788566400,
+   "report_end": 1788652799,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 800,
+     "unwanted": 0
+    },
+    "engagement": {
+     "positive": 100,
+     "negative": 0
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "news",
+   "report_start": 1788652800,
+   "report_end": 1788739199,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 2600,
+     "unwanted": 300
+    },
+    "engagement": {
+     "positive": 500,
+     "negative": 100
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "receipts",
+   "report_start": 1788652800,
+   "report_end": 1788739199,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 1000,
+     "unwanted": 0
+    },
+    "engagement": {
+     "positive": 100,
+     "negative": 0
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "news",
+   "report_start": 1788739200,
+   "report_end": 1788825599,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 4000,
+     "unwanted": 300
+    },
+    "engagement": {
+     "positive": 700,
+     "negative": 100
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "receipts",
+   "report_start": 1788739200,
+   "report_end": 1788825599,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 800,
+     "unwanted": 0
+    },
+    "engagement": {
+     "positive": 100,
+     "negative": 0
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "news",
+   "report_start": 1788825600,
+   "report_end": 1788911999,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 4200,
+     "unwanted": 300
+    },
+    "engagement": {
+     "positive": 700,
+     "negative": 100
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "receipts",
+   "report_start": 1788825600,
+   "report_end": 1788911999,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 800,
+     "unwanted": 0
+    },
+    "engagement": {
+     "positive": 100,
+     "negative": 0
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "news",
+   "report_start": 1788912000,
+   "report_end": 1788998399,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 4400,
+     "unwanted": 300
+    },
+    "engagement": {
+     "positive": 500,
+     "negative": 100
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "receipts",
+   "report_start": 1788912000,
+   "report_end": 1788998399,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 1000,
+     "unwanted": 0
+    },
+    "engagement": {
+     "positive": 100,
+     "negative": 0
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "news",
+   "report_start": 1788998400,
+   "report_end": 1789084799,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 4400,
+     "unwanted": 300
+    },
+    "engagement": {
+     "positive": 600,
+     "negative": 100
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "receipts",
+   "report_start": 1788998400,
+   "report_end": 1789084799,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 1000,
+     "unwanted": 0
+    },
+    "engagement": {
+     "positive": 100,
+     "negative": 0
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "news",
+   "report_start": 1789084800,
+   "report_end": 1789171199,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 4000,
+     "unwanted": 300
+    },
+    "engagement": {
+     "positive": 500,
+     "negative": 100
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "receipts",
+   "report_start": 1789084800,
+   "report_end": 1789171199,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 1000,
+     "unwanted": 0
+    },
+    "engagement": {
+     "positive": 100,
+     "negative": 0
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "news",
+   "report_start": 1789171200,
+   "report_end": 1789257599,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 2500,
+     "unwanted": 300
+    },
+    "engagement": {
+     "positive": 500,
+     "negative": 100
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "receipts",
+   "report_start": 1789171200,
+   "report_end": 1789257599,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 800,
+     "unwanted": 0
+    },
+    "engagement": {
+     "positive": 100,
+     "negative": 0
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "news",
+   "report_start": 1789257600,
+   "report_end": 1789343999,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 2600,
+     "unwanted": 300
+    },
+    "engagement": {
+     "positive": 500,
+     "negative": 100
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "receipts",
+   "report_start": 1789257600,
+   "report_end": 1789343999,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 900,
+     "unwanted": 0
+    },
+    "engagement": {
+     "positive": 100,
+     "negative": 0
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "news",
+   "report_start": 1789344000,
+   "report_end": 1789430399,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 4000,
+     "unwanted": 300
+    },
+    "engagement": {
+     "positive": 500,
+     "negative": 100
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "receipts",
+   "report_start": 1789344000,
+   "report_end": 1789430399,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 1000,
+     "unwanted": 0
+    },
+    "engagement": {
+     "positive": 100,
+     "negative": 0
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "news",
+   "report_start": 1789430400,
+   "report_end": 1789516799,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 4000,
+     "unwanted": 300
+    },
+    "engagement": {
+     "positive": 600,
+     "negative": 100
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "receipts",
+   "report_start": 1789430400,
+   "report_end": 1789516799,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 1000,
+     "unwanted": 0
+    },
+    "engagement": {
+     "positive": 100,
+     "negative": 0
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "news",
+   "report_start": 1789516800,
+   "report_end": 1789603199,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 4300,
+     "unwanted": 300
+    },
+    "engagement": {
+     "positive": 700,
+     "negative": 100
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "receipts",
+   "report_start": 1789516800,
+   "report_end": 1789603199,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 900,
+     "unwanted": 0
+    },
+    "engagement": {
+     "positive": 100,
+     "negative": 0
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "news",
+   "report_start": 1789603200,
+   "report_end": 1789689599,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 4200,
+     "unwanted": 300
+    },
+    "engagement": {
+     "positive": 700,
+     "negative": 100
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "receipts",
+   "report_start": 1789603200,
+   "report_end": 1789689599,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 900,
+     "unwanted": 0
+    },
+    "engagement": {
+     "positive": 100,
+     "negative": 0
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "news",
+   "report_start": 1789862400,
+   "report_end": 1789948799,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 2500,
+     "unwanted": 300
+    },
+    "engagement": {
+     "positive": 500,
+     "negative": 100
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "receipts",
+   "report_start": 1789862400,
+   "report_end": 1789948799,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 900,
+     "unwanted": 0
+    },
+    "engagement": {
+     "positive": 100,
+     "negative": 0
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "news",
+   "report_start": 1789948800,
+   "report_end": 1790035199,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 4000,
+     "unwanted": 300
+    },
+    "engagement": {
+     "positive": 600,
+     "negative": 100
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "receipts",
+   "report_start": 1789948800,
+   "report_end": 1790035199,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 1000,
+     "unwanted": 0
+    },
+    "engagement": {
+     "positive": 100,
+     "negative": 0
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "news",
+   "report_start": 1790035200,
+   "report_end": 1790121599,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 4200,
+     "unwanted": 400
+    },
+    "engagement": {
+     "positive": 600,
+     "negative": 100
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "receipts",
+   "report_start": 1790035200,
+   "report_end": 1790121599,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 1000,
+     "unwanted": 0
+    },
+    "engagement": {
+     "positive": 100,
+     "negative": 0
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "news",
+   "report_start": 1790121600,
+   "report_end": 1790207999,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 4100,
+     "unwanted": 300
+    },
+    "engagement": {
+     "positive": 500,
+     "negative": 100
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "receipts",
+   "report_start": 1790121600,
+   "report_end": 1790207999,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 800,
+     "unwanted": 0
+    },
+    "engagement": {
+     "positive": 100,
+     "negative": 0
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "news",
+   "report_start": 1790208000,
+   "report_end": 1790294399,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 4200,
+     "unwanted": 300
+    },
+    "engagement": {
+     "positive": 500,
+     "negative": 100
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "receipts",
+   "report_start": 1790208000,
+   "report_end": 1790294399,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 900,
+     "unwanted": 0
+    },
+    "engagement": {
+     "positive": 100,
+     "negative": 0
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "news",
+   "report_start": 1790294400,
+   "report_end": 1790380799,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 2200,
+     "unwanted": 2500
+    },
+    "engagement": {
+     "positive": 700,
+     "negative": 400
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "receipts",
+   "report_start": 1790294400,
+   "report_end": 1790380799,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 1000,
+     "unwanted": 0
+    },
+    "engagement": {
+     "positive": 100,
+     "negative": 0
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "news",
+   "report_start": 1790380800,
+   "report_end": 1790467199,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 600,
+     "unwanted": 1500
+    },
+    "engagement": {
+     "positive": 500,
+     "negative": 100
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "receipts",
+   "report_start": 1790380800,
+   "report_end": 1790467199,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 1000,
+     "unwanted": 0
+    },
+    "engagement": {
+     "positive": 100,
+     "negative": 0
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "news",
+   "report_start": 1790467200,
+   "report_end": 1790553599,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 800,
+     "unwanted": 1500
+    },
+    "engagement": {
+     "positive": 600,
+     "negative": 100
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "receipts",
+   "report_start": 1790467200,
+   "report_end": 1790553599,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 900,
+     "unwanted": 0
+    },
+    "engagement": {
+     "positive": 100,
+     "negative": 0
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "news",
+   "report_start": 1790553600,
+   "report_end": 1790639999,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 4300,
+     "unwanted": 1500
+    },
+    "engagement": {
+     "positive": 700,
+     "negative": 100
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "receipts",
+   "report_start": 1790553600,
+   "report_end": 1790639999,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 1000,
+     "unwanted": 0
+    },
+    "engagement": {
+     "positive": 100,
+     "negative": 0
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "news",
+   "report_start": 1790640000,
+   "report_end": 1790726399,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 4400,
+     "unwanted": 400
+    },
+    "engagement": {
+     "positive": 500,
+     "negative": 100
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "receipts",
+   "report_start": 1790640000,
+   "report_end": 1790726399,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 800,
+     "unwanted": 0
+    },
+    "engagement": {
+     "positive": 100,
+     "negative": 0
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "news",
+   "report_start": 1790726400,
+   "report_end": 1790812799,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 4400,
+     "unwanted": 400
+    },
+    "engagement": {
+     "positive": 700,
+     "negative": 100
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "receipts",
+   "report_start": 1790726400,
+   "report_end": 1790812799,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 800,
+     "unwanted": 0
+    },
+    "engagement": {
+     "positive": 100,
+     "negative": 0
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "news",
+   "report_start": 1790812800,
+   "report_end": 1790899199,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 4000,
+     "unwanted": 400
+    },
+    "engagement": {
+     "positive": 600,
+     "negative": 100
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "receipts",
+   "report_start": 1790812800,
+   "report_end": 1790899199,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 1000,
+     "unwanted": 0
+    },
+    "engagement": {
+     "positive": 100,
+     "negative": 0
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "news",
+   "report_start": 1790899200,
+   "report_end": 1790985599,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 4300,
+     "unwanted": 400
+    },
+    "engagement": {
+     "positive": 700,
+     "negative": 100
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "receipts",
+   "report_start": 1790899200,
+   "report_end": 1790985599,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 900,
+     "unwanted": 0
+    },
+    "engagement": {
+     "positive": 100,
+     "negative": 0
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "news",
+   "report_start": 1790985600,
+   "report_end": 1791071999,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 2700,
+     "unwanted": 400
+    },
+    "engagement": {
+     "positive": 600,
+     "negative": 100
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "receipts",
+   "report_start": 1790985600,
+   "report_end": 1791071999,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 800,
+     "unwanted": 0
+    },
+    "engagement": {
+     "positive": 100,
+     "negative": 0
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "news",
+   "report_start": 1791072000,
+   "report_end": 1791158399,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 2800,
+     "unwanted": 400
+    },
+    "engagement": {
+     "positive": 600,
+     "negative": 100
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "receipts",
+   "report_start": 1791072000,
+   "report_end": 1791158399,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 800,
+     "unwanted": 0
+    },
+    "engagement": {
+     "positive": 100,
+     "negative": 0
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "news",
+   "report_start": 1791158400,
+   "report_end": 1791244799,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 4300,
+     "unwanted": 400
+    },
+    "engagement": {
+     "positive": 700,
+     "negative": 100
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "receipts",
+   "report_start": 1791158400,
+   "report_end": 1791244799,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 800,
+     "unwanted": 0
+    },
+    "engagement": {
+     "positive": 100,
+     "negative": 0
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "news",
+   "report_start": 1791244800,
+   "report_end": 1791331199,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 4100,
+     "unwanted": 400
+    },
+    "engagement": {
+     "positive": 600,
+     "negative": 100
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "receipts",
+   "report_start": 1791244800,
+   "report_end": 1791331199,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 800,
+     "unwanted": 0
+    },
+    "engagement": {
+     "positive": 100,
+     "negative": 0
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "news",
+   "report_start": 1791331200,
+   "report_end": 1791417599,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 4300,
+     "unwanted": 400
+    },
+    "engagement": {
+     "positive": 700,
+     "negative": 100
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "receipts",
+   "report_start": 1791331200,
+   "report_end": 1791417599,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 1000,
+     "unwanted": 0
+    },
+    "engagement": {
+     "positive": 100,
+     "negative": 0
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "news",
+   "report_start": 1791417600,
+   "report_end": 1791503999,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 4400,
+     "unwanted": 500
+    },
+    "engagement": {
+     "positive": 700,
+     "negative": 100
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "receipts",
+   "report_start": 1791417600,
+   "report_end": 1791503999,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 800,
+     "unwanted": 0
+    },
+    "engagement": {
+     "positive": 100,
+     "negative": 0
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "news",
+   "report_start": 1791504000,
+   "report_end": 1791590399,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 4000,
+     "unwanted": 400
+    },
+    "engagement": {
+     "positive": 700,
+     "negative": 100
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "receipts",
+   "report_start": 1791504000,
+   "report_end": 1791590399,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 1000,
+     "unwanted": 0
+    },
+    "engagement": {
+     "positive": 100,
+     "negative": 0
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "news",
+   "report_start": 1791590400,
+   "report_end": 1791676799,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 2500,
+     "unwanted": 500
+    },
+    "engagement": {
+     "positive": 500,
+     "negative": 100
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "receipts",
+   "report_start": 1791590400,
+   "report_end": 1791676799,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 1000,
+     "unwanted": 0
+    },
+    "engagement": {
+     "positive": 100,
+     "negative": 0
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "news",
+   "report_start": 1791676800,
+   "report_end": 1791763199,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 2800,
+     "unwanted": 400
+    },
+    "engagement": {
+     "positive": 600,
+     "negative": 100
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "receipts",
+   "report_start": 1791676800,
+   "report_end": 1791763199,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 1000,
+     "unwanted": 0
+    },
+    "engagement": {
+     "positive": 100,
+     "negative": 0
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "news",
+   "report_start": 1791763200,
+   "report_end": 1791849599,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 4100,
+     "unwanted": 400
+    },
+    "engagement": {
+     "positive": 600,
+     "negative": 100
+    }
+   }
+  ]
+ },
+ {
+  "header": {
+   "version": 1,
+   "source": "Comcast/Xfinity",
+   "dkim_domain": "example.com",
+   "dkim_selector": "receipts",
+   "report_start": 1791763200,
+   "report_end": 1791849599,
+   "contact_info": "aprf-noreply@example.net",
+   "extra_info": "",
+   "sdi_used": "N/A"
+  },
+  "body": [
+   {
+    "classification": {
+     "inbox": 900,
+     "unwanted": 0
+    },
+    "engagement": {
+     "positive": 100,
+     "negative": 0
+    }
+   }
+  ]
+ }
+]

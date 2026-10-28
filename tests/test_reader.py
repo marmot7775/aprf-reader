@@ -1,6 +1,7 @@
 import gzip
 import json
 import mailbox
+import re
 from datetime import date
 from email.message import EmailMessage
 from pathlib import Path
@@ -187,3 +188,49 @@ def test_cli(tmp_path, capsys):
     assert out.read_text().startswith("<!doctype html>")
     (tmp_path / "empty").mkdir()
     assert main([str(tmp_path / "empty")]) == 1
+
+
+def test_changes_flag_big_moves_only():
+    (s1, s2) = streams(parse((FIX / "sample_six_weeks.json").read_bytes()))
+    assert s1.selector == "news" and s1.changes == [
+        "unwanted rose from 300 on 2026-09-24 to 2,500 on 2026-09-25.",
+        "negative rose from 100 on 2026-09-24 to 400 on 2026-09-25.",
+        "inbox fell from 2,200 on 2026-09-25 to 600 on 2026-09-26.",
+    ]
+    assert s2.changes == []  # steady stream, nothing flagged
+    # 10 to 200 is many times higher but under two buckets of movement
+    (s,) = streams([parse(json.dumps(report(0, inbox=100)).encode())[0],
+                    parse(json.dumps(report(1, inbox=100) | {"body": [{"classification": {"unwanted": 200}}]}).encode())[0]])
+    assert not any("unwanted" in c for c in s.changes)
+
+
+def test_json_output(capsys):
+    assert main([str(FIX / "sample_six_weeks.json"), "--json"]) == 0
+    doc = json.loads(capsys.readouterr().out)
+    assert doc["reports"] == 80 and [s["selector"] for s in doc["streams"]] == ["news", "receipts"]
+    news = doc["streams"][0]
+    assert news["missing_days"] == 2 and news["columns"] == ["inbox", "unwanted", "positive", "negative"]
+    assert news["days"][0]["segments"][0]["segment"] == [] and len(news["changes"]) == 3
+
+
+def test_terminal_view():
+    from aprf_reader.render import to_terminal
+    loaded = load([FIX / "sample_six_weeks.json", FIX / "comcast_beta.json"])
+    out = to_terminal(loaded, color=False, width=100)
+    assert "example.com  selector news" in out and "2 days with no report" in out
+    assert "! unwanted rose from 300 on Sep 24 to 2,500 on Sep 25." in out
+    assert "✓ No big day-to-day moves" in out and "one day" in out
+    assert "\033[" not in out and "\033[" in to_terminal(loaded, color=True)
+    assert max(len(line) for line in out.splitlines()) <= 100
+    inbox = next(line for line in out.splitlines() if line.startswith("  inbox"))
+    assert re.search("[▁-█] +[▁-█]", inbox)  # the two days with no report show as a break
+
+
+def test_cli_terminal_when_interactive(monkeypatch, capsys):
+    monkeypatch.setattr("sys.stdout.isatty", lambda: True)
+    monkeypatch.setenv("NO_COLOR", "1")
+    assert main([str(FIX / "sample_six_weeks.json")]) == 0
+    out = capsys.readouterr().out
+    assert out.startswith("APRF placement summary") and "\033[" not in out
+    assert main([str(FIX / "sample_six_weeks.json"), "--markdown"]) == 0
+    assert capsys.readouterr().out.startswith("# APRF placement summary")

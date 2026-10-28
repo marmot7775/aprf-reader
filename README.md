@@ -2,9 +2,16 @@
 
 Reads APRF (Aggregate Performance Reporting) reports and tells you where the
 mail you signed landed: how much reached the inbox, how much was treated as
-unwanted, and how recipients reacted, day by day and per DKIM selector.
+unwanted, and how recipients reacted, day by day and per DKIM selector. It
+points out the days worth a look, such as a jump in unwanted mail.
 
-**Status: 0.2, beta.** Reads reports in the format of draft-ietf-mailmaint-aprf-00.
+Two ways to use it, with the same results:
+
+- **In your browser:** [aprf.dns-audit.com](https://aprf.dns-audit.com). Drop
+  your reports on the page. They are read on your computer and never uploaded.
+- **On the command line:** `pipx install aprf-reader`.
+
+**Status: 0.3, beta.** Reads reports in the format of draft-ietf-mailmaint-aprf-00.
 
 ## What APRF is
 
@@ -26,10 +33,17 @@ environment, or with pip (`pip3` on some systems) inside a virtual environment.
 
 ```bash
 pipx install aprf-reader
-aprf-reader reports/                      # Markdown summary to the terminal
-aprf-reader reports/ --html summary.html  # and a page you can open or share
+aprf-reader reports/                      # overview in the terminal
 aprf-reader APRF.mbox                     # a mail folder exported as mbox
+aprf-reader reports/ --markdown           # Markdown with daily tables
+aprf-reader reports/ --html summary.html  # and a page you can open or share
+aprf-reader reports/ --json               # the summary as data, for scripts
 ```
+
+In a terminal you get an overview: for each stream, each count's latest value,
+its daily range, and a trend line with a gap for each day with no report, then
+the changes worth a look. Piped or written to a file with `--md`, the output
+is Markdown with the full daily tables.
 
 Point it at report files (`.json`, `.json.gz`), saved report emails (`.eml`),
 mailbox exports (`.mbox`), or folders of them. The easiest way to collect reports
@@ -42,6 +56,10 @@ on stderr and at the end of the summary, each with a reason.
 
 Each stream (provider, signing domain, selector) gets a table with one row per
 day and segment, a trend line per count, and a row for each day with no report.
+A change worth a look is a day when unwanted mail or negative reactions at
+least doubled and grew by 200 or more, or inbox mail fell by half and by 200
+or more, against the report before. Comcast counts in steps of 100, so smaller
+moves are left out as rounding.
 A change in the report's `version` field is called out, since the draft uses it
 to mark a change in what a category counts.
 
@@ -59,6 +77,17 @@ to mark a change in what a category counts.
   (`src/aprf_reader/report.py`), so a new draft revision is a small update.
 - When the same day arrives twice, keep the first copy and say so. The draft
   has not yet decided whether a resend replaces the original.
+
+## How the web page is built
+
+`web/src/aprf.js` is a JavaScript port of the Python reader.
+`tests/test_web_parity.py` runs both on the same files (JSON, gzip, saved
+emails, forwarded emails, mailbox exports, duplicates and hostile text) and
+requires the same JSON, Markdown and HTML output, so the page and the command
+line cannot drift apart. `node web/build.js` inlines everything into one
+`web/dist/index.html` whose Content Security Policy blocks every network
+request, so it also works saved to disk. A merge to main that passes the
+tests deploys it to Cloudflare.
 
 ## Related
 

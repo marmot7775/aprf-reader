@@ -10,6 +10,11 @@ from functools import cached_property
 from .report import ENGAGEMENT_NAMES, NO_SDI, PLACEMENT_NAMES, Report
 
 
+# Counts where a jump up is bad news, or a drop is
+CHANGES = {"unwanted": "rise", "negative": "rise", "inbox": "fall"}
+MIN_MOVE = 200
+
+
 @dataclass(frozen=True)
 class Row:
     day: date
@@ -70,6 +75,27 @@ class Stream:
                 for d, r in sorted(self.by_day.items())]
 
     @cached_property
+    def changes(self) -> list[str]:
+        """Day-to-day moves big enough to look at, between one report day and the next."""
+        out = []
+        for col, (_, k) in enumerate(self.columns):
+            rule = CHANGES.get(k)
+            if rule is None:
+                continue
+            pts = self.trend(col)
+            for (x0, old), (x1, new) in zip(pts, pts[1:]):
+                # Comcast's buckets are 100 wide, so a move under two buckets is noise
+                if rule == "rise" and new >= 2 * old and new - old >= MIN_MOVE:
+                    verb = "rose"
+                elif rule == "fall" and 2 * new <= old and old - new >= MIN_MOVE:
+                    verb = "fell"
+                else:
+                    continue
+                d0, d1 = self.first + timedelta(x0), self.first + timedelta(x1)
+                out.append(f"{k} {verb} from {old:,} on {d0} to {new:,} on {d1}.")
+        return sorted(out, key=lambda t: t.rsplit(" on ", 1)[1])
+
+    @cached_property
     def notes(self) -> list[str]:
         out = []
         prev: str | None = None
@@ -92,3 +118,20 @@ def streams(reports: list[Report]) -> list[Stream]:
     for r in reports:
         groups[(r.source, r.dkim_domain.lower(), r.dkim_selector)][r.day] = r
     return [Stream(src, dom, sel, days) for (src, dom, sel), days in sorted(groups.items())]
+
+
+def to_dict(reports: list[Report], skipped: list[tuple[str, str]]) -> dict:
+    """The summary as plain data, for --json and for checking the web page against."""
+    return {
+        "reports": len(reports),
+        "streams": [{
+            "source": s.source, "domain": s.domain, "selector": s.selector,
+            "first": str(s.first), "last": str(s.last), "missing_days": s.missing,
+            "columns": [k for _, k in s.columns],
+            "days": [{"day": str(d), "version": r.version, "segments": [
+                {"segment": list(seg.path), "classification": seg.classification, "engagement": seg.engagement}
+                for seg in r.segments]} for d, r in sorted(s.by_day.items())],
+            "changes": s.changes, "notes": s.notes,
+        } for s in streams(reports)],
+        "skipped": [{"where": w, "reason": r} for w, r in skipped],
+    }

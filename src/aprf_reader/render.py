@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import html
+import re
+from datetime import date
 
 from . import __version__
 from .load import Loaded
@@ -56,6 +58,8 @@ def to_markdown(loaded: Loaded) -> str:
             else:
                 lines.append(f"| {row.day} | {_md(row.segment)} | " + " | ".join(_n(v) for v in row.values) + " |")
         lines.append("")
+        if s.changes:
+            lines += ["Changes worth a look:", ""] + [f"- {_md(c)}" for c in s.changes] + [""]
         if s.notes:
             lines += [f"- {_md(n)}" for n in s.notes] + [""]
     if loaded.skipped:
@@ -118,6 +122,8 @@ def to_html(loaded: Loaded) -> str:
             else:
                 parts.append(f"<tr><td>{row.day}<td>{e(row.segment)}" + "".join(f"<td>{_n(v)}" for v in row.values))
         parts.append("</tbody></table></div>")
+        if s.changes:
+            parts.append("<p>Changes worth a look:</p><ul>" + "".join(f"<li>{e(c)}" for c in s.changes) + "</ul>")
         if s.notes:
             parts.append("<ul>" + "".join(f"<li>{e(n)}" for n in s.notes) + "</ul>")
     if loaded.skipped:
@@ -125,3 +131,92 @@ def to_html(loaded: Loaded) -> str:
     parts.append(f"<p class=muted>Read by aprf-reader {e(__version__)} against {DRAFT}. Nothing left this computer.</p>")
     parts.append("</body></html>")
     return "\n".join(parts) + "\n"
+
+
+# ---- terminal view ----
+
+BARS = "▁▂▃▄▅▆▇█"
+
+
+class _Style:
+    def __init__(self, color: bool):
+        self.on = color
+
+    def __call__(self, code: str, text: str) -> str:
+        return f"\033[{code}m{text}\033[0m" if self.on else text
+
+    def bold(self, t: str) -> str: return self("1", t)
+    def dim(self, t: str) -> str: return self("2", t)
+    def accent(self, t: str) -> str: return self("1;34", t)
+    def warn(self, t: str) -> str: return self("33", t)
+    def good(self, t: str) -> str: return self("32", t)
+
+
+def _bars(points: list[tuple[int, int]], width: int) -> str:
+    """One character per day, a space for a day with no report; days share a cell when they do not fit."""
+    span = points[-1][0] + 1
+    cells: list[int | None] = [None] * min(span, width)
+    for x, v in points:
+        i = x * len(cells) // span
+        cells[i] = v if cells[i] is None else max(cells[i], v)
+    top = max(v for _, v in points) or 1
+    if min(v for _, v in points) == top:
+        # A flat line is the same every day; a full bar would read as a peak
+        return "".join(" " if v is None else BARS[3] for v in cells)
+    return "".join(" " if v is None else BARS[min(7, v * 7 // top)] if v else BARS[0] for v in cells)
+
+
+def _date(d) -> str:
+    return f"{d:%b} {d.day}"
+
+
+def _range(a, b) -> str:
+    if a == b:
+        return f"{_date(a)}, {a.year}"
+    return (_date(a) if a.year == b.year else f"{_date(a)}, {a.year}") + f" to {_date(b)}, {b.year}"
+
+
+def _wrap(text: str, width: int, indent: str = "") -> list[str]:
+    import textwrap
+    return textwrap.wrap(text, width=max(40, width), initial_indent=indent, subsequent_indent=indent) or [indent]
+
+
+def to_terminal(loaded: Loaded, color: bool = True, width: int = 100) -> str:
+    """A readable overview for a terminal: per stream, each count's latest value, range and trend."""
+    st = _Style(color)
+    ss = streams(loaded.reports)
+    out = [st.bold("APRF placement summary") + st.dim(f"  {_counts(loaded, ss)}"), ""]
+    out += [st.dim(line) for line in _wrap(CAVEAT, min(width, 100))] + [""]
+    for s in ss:
+        out.append(st.accent(s.domain) + "  " + st.bold(f"selector {s.selector}"))
+        meta = [s.source, _range(s.first, s.last), _plural(len(s.by_day), "report")]
+        line = st.dim(" · ".join(meta))
+        if s.missing:
+            line += st.dim(" · ") + st.warn(f"{_plural(s.missing, 'day')} with no report")
+        out += [line, ""]
+        names = [k for _, k in s.columns]
+        nw = max([len(n) for n in names] + [5])
+        trends = [s.trend(i) for i in range(len(names))]
+        latest = [f"{t[-1][1]:,}" for t in trends]
+        ranges = [f"{min(v for _, v in t):,} to {max(v for _, v in t):,}" for t in trends]
+        lw, rw = max(len(x) for x in latest + ["latest"]), max(len(x) for x in ranges + ["range"])
+        bw = max(10, min(60, width - (2 + nw + 2 + lw + 2 + rw + 2)))
+        out.append(st.dim(f"  {'':<{nw}}  {'latest':>{lw}}  {'range':<{rw}}  trend"))
+        for name, t, l, r in zip(names, trends, latest, ranges):
+            out.append(f"  {name:<{nw}}  {st.bold(f'{l:>{lw}}')}  {r:<{rw}}  {st.accent(_bars(t, bw)) if len(t) > 1 else st.dim('one day')}")
+        out.append("")
+        if s.changes:
+            out.append(st.bold("  Changes worth a look"))
+            out += [f"  {st.warn('!')} " + re.sub(r"(\d{4})-(\d\d)-(\d\d)", lambda m: _date(date.fromisoformat(m[0])), c)
+                    for c in s.changes]
+        else:
+            out.append(f"  {st.good('✓')} " + st.dim("No big day-to-day moves in inbox, unwanted, or negative counts."))
+        for n in s.notes:
+            out += _wrap(n, width - 4, "  · ")
+        out.append("")
+    if loaded.skipped:
+        out.append(st.warn(f"Skipped {len(loaded.skipped)}"))
+        out += [st.dim(f"  {w}: {r}") for w, r in loaded.skipped]
+        out.append("")
+    out.append(st.dim(f"aprf-reader {__version__}, {DRAFT}. Daily tables: --markdown, or --html for a page."))
+    return "\n".join(out) + "\n"
