@@ -23,9 +23,10 @@ NODE = shutil.which("node")
 pytestmark = pytest.mark.skipif(NODE is None, reason="node is not installed")
 
 
-def web(mode: str, paths: list[Path]) -> str:
-    return subprocess.run([NODE, str(ROOT / "web/test/run.js"), mode, *map(str, paths)], check=True,
-                          capture_output=True, text=True, env={"APRF_VERSION": __version__}).stdout
+def web(mode: str, paths: list, paste: bytes | None = None) -> str:
+    args = [*map(str, paths)] + (["-"] if paste is not None else [])
+    return subprocess.run([NODE, str(ROOT / "web/test/run.js"), mode, *args], check=True, input=paste or b"",
+                          capture_output=True, env={"APRF_VERSION": __version__}).stdout.decode()
 
 
 def _engine(doc: dict) -> dict:
@@ -168,3 +169,14 @@ def test_zips_read_the_same(tmp_path):
     assert reasons["inner.zip"] == reasons["box.mbox"] == "a zip or mailbox inside a zip is not read; unzip it first"
     assert reasons["huge.json"] == "larger than 10 MB" and reasons["fake.zip"] == "not a readable zip file"
     assert "broken.json" in reasons and not any("MACOSX" in w for w, _ in loaded.skipped)
+
+
+@pytest.mark.parametrize("kind", ["json", "email", "gzip", "junk"])
+def test_pastes_read_the_same(kind):
+    raw = json.dumps(report(0)).encode()
+    paste = {"json": b"  \n" + raw, "email": email(gzip.compress(raw), "gzip", "r.json.gz").as_bytes(),
+             "gzip": gzip.compress(raw), "junk": b"hello, not a report"}[kind]
+    loaded = load([], paste)
+    assert _engine(json.loads(web("--json", [], paste))) == _engine(to_dict(loaded))
+    assert (len(loaded.reports), loaded.skipped[0][0] if loaded.skipped else None) == (
+        {"json": (1, None), "email": (1, None), "gzip": (1, None), "junk": (0, "pasted.eml")}[kind])

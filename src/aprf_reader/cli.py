@@ -17,7 +17,8 @@ from .summary import to_dict
 
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="aprf-reader", description="Summarise APRF placement reports.")
-    p.add_argument("paths", nargs="+", type=Path, help="report files (.json, .json.gz, .eml, .mbox, .zip) or folders")
+    p.add_argument("paths", nargs="+", type=Path,
+                   help="report files (.json, .json.gz, .eml, .mbox, .zip) or folders; - reads a pasted report or email from stdin")
     p.add_argument("--md", type=Path, help="write the summary here instead of printing it")
     p.add_argument("--html", type=Path, help="also write a self-contained HTML page here")
     p.add_argument("--markdown", action="store_true", help="print Markdown with daily tables, even in a terminal")
@@ -25,10 +26,12 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--version", action="version", version=f"aprf-reader {__version__}")
     args = p.parse_args(argv)
 
-    for path in args.paths:
+    paths = [x for x in args.paths if str(x) != "-"]
+    for path in paths:
         if not path.exists():
             p.error(f"no such file or folder: {path}")
-    loaded = load(args.paths)
+    pasted = sys.stdin.buffer.read() if len(paths) < len(args.paths) else None
+    loaded = load(paths, pasted)
     for where, reason in loaded.skipped:
         print(f"skipped {where}: {reason}", file=sys.stderr)
     if not loaded.reports:

@@ -346,6 +346,20 @@
   $('pick-folder').addEventListener('click', () => $('folder').click());
   $('files').addEventListener('change', (e) => run([...e.target.files].map((file) => ({ name: file.name, file })), 'files'));
   $('folder').addEventListener('change', (e) => run([...e.target.files].filter((f) => APRF.wanted(f.name)).map((file) => ({ name: file.webkitRelativePath || file.name, file })), 'folder'));
+  // A paste is read like a file named by what it looks like: JSON, or a whole email
+  const pasted = (text) => {
+    const bytes = new TextEncoder().encode(text);
+    run([{ name: APRF.pastedName(bytes), file: new Blob([bytes]) }], 'paste');
+  };
+  $('paste-read').addEventListener('click', () => { if ($('paste-box').value.trim()) pasted($('paste-box').value); });
+  // Ctrl+V or Cmd+V anywhere on the page reads what was copied, text or files
+  document.addEventListener('paste', (e) => {
+    if (e.target.closest && e.target.closest('textarea, input')) return;
+    const files = [...(e.clipboardData && e.clipboardData.files || [])];
+    const text = e.clipboardData ? e.clipboardData.getData('text') : '';
+    if (files.length) { e.preventDefault(); run(files.map((file) => ({ name: file.name, file })), 'paste'); }
+    else if (text.trim()) { e.preventDefault(); pasted(text); }
+  });
   $('sample').addEventListener('click', () => run([{ name: 'sample.json', file: new Blob([window.APRF_SAMPLE]) }], 'sample'));
 
   const zone = $('input');
