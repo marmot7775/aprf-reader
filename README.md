@@ -20,10 +20,12 @@ what they don't](https://dns-audit.com/articles/aprf).
 
 ## Use it
 
-Python 3.11 or later, no other dependencies.
+Python 3.11 or later, no other dependencies. Install with
+[pipx](https://pipx.pypa.io/), which keeps command line tools in their own
+environment, or with pip (`pip3` on some systems) inside a virtual environment.
 
 ```bash
-pip install aprf-reader
+pipx install aprf-reader
 aprf-reader reports/                      # Markdown summary to the terminal
 aprf-reader reports/ --html summary.html  # and a page you can open or share
 ```
