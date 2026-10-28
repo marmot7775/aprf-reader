@@ -201,7 +201,7 @@ tr:last-child td { border-bottom: 0; }
     <div class="drop" id="drop">
       <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 21V7m0 0-5 5m5-5 5 5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 20v4a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
       <strong>Drop report files or a folder here</strong>
-      <p>Report files (<code>.json</code>, <code>.json.gz</code>), saved report emails (<code>.eml</code>), or a mailbox export (<code>.mbox</code>). Duplicates are skipped.</p>
+      <p>Report files (<code>.json</code>, <code>.json.gz</code>), saved report emails (<code>.eml</code>), a mailbox export (<code>.mbox</code>), or a <code>.zip</code> of any of them. Copies are counted once.</p>
     </div>
     <div class="actions">
       <button class="btn primary" type="button" id="pick-files">Choose files</button>
@@ -209,7 +209,7 @@ tr:last-child td { border-bottom: 0; }
       <span class="spacer"></span>
       <button class="link-btn" type="button" id="sample">Try a sample</button>
     </div>
-    <input type="file" id="files" multiple hidden accept=".json,.gz,.eml,.mbox,application/json,application/gzip,message/rfc822">
+    <input type="file" id="files" multiple hidden accept=".json,.gz,.eml,.mbox,.zip,application/json,application/gzip,application/zip,message/rfc822">
     <input type="file" id="folder" webkitdirectory multiple hidden>
     <p class="status" id="status" role="status" aria-live="polite" hidden></p>
   </section>

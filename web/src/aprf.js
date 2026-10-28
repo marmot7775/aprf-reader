@@ -16,7 +16,9 @@
   // Counts where a jump up is bad news, or a drop is
   const CHANGES = { unwanted: 'rise', negative: 'rise', inbox: 'fall' };
   const MIN_MOVE = 200;
-  const SUFFIXES = ['.json', '.json.gz', '.eml', '.mbox'];
+  const SUFFIXES = ['.json', '.json.gz', '.eml', '.mbox', '.zip'];
+  // A zip of a year of daily reports for a few selectors is a few thousand files
+  const MAX_ZIP_ENTRIES = 20000;
   // A daily report is a few KB; this stops a stray huge file or gzip bomb
   const MAX_BYTES = 10 * 1024 * 1024;
   const DAY_MS = 86400000;
@@ -169,11 +171,15 @@
     for (let i = 0; i < bytes.length; i += 32768) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 32768));
     return s;
   }
-  const bytesOf = (s) => Uint8Array.from(s, (c) => c.charCodeAt(0) & 255);
+  function bytesOf(s) {
+    const out = new Uint8Array(s.length);
+    for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i) & 255;
+    return out;
+  }
   const isGzip = (b) => b.length > 1 && b[0] === 0x1f && b[1] === 0x8b;
 
-  async function gunzip(bytes) {
-    const reader = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip')).getReader();
+  async function gunzip(bytes, format) {
+    const reader = new Blob([bytes]).stream().pipeThrough(new DecompressionStream(format || 'gzip')).getReader();
     const chunks = [];
     let size = 0;
     try {
@@ -291,6 +297,77 @@
     return found;
   }
 
+  // ---- zip, as Python's zipfile reads it ----
+
+  let CRC_TABLE = null;
+  function crc32(b) {
+    if (!CRC_TABLE) {
+      CRC_TABLE = new Uint32Array(256);
+      for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; CRC_TABLE[n] = c >>> 0; }
+    }
+    let c = 0xffffffff;
+    for (let i = 0; i < b.length; i++) c = CRC_TABLE[(c ^ b[i]) & 255] ^ (c >>> 8);
+    return (c ^ 0xffffffff) >>> 0;
+  }
+
+  // The central directory: [{ name, flags, method, crc, csize, usize, offset }]
+  function zipEntries(b) {
+    const v = new DataView(b.buffer, b.byteOffset, b.byteLength);
+    let end = -1;
+    for (let i = b.length - 22; i >= Math.max(0, b.length - 22 - 65535); i--) if (v.getUint32(i, true) === 0x06054b50) { end = i; break; }
+    if (end < 0) throw new ReportError('not a readable zip file');
+    const count = v.getUint16(end + 10, true);
+    let at = v.getUint32(end + 16, true);
+    const out = [];
+    for (let k = 0; k < count; k++) {
+      if (at + 46 > b.length || v.getUint32(at, true) !== 0x02014b50) throw new ReportError('not a readable zip file');
+      const flags = v.getUint16(at + 8, true);
+      const nlen = v.getUint16(at + 28, true);
+      const raw = b.subarray(at + 46, at + 46 + nlen);
+      // shortcut: names without the UTF-8 flag are read as Latin-1, where zipfile uses cp437; both agree on ASCII
+      const name = flags & 0x800 ? new TextDecoder().decode(raw) : latin1(raw);
+      out.push({ name, flags, method: v.getUint16(at + 10, true), crc: v.getUint32(at + 16, true), csize: v.getUint32(at + 20, true), usize: v.getUint32(at + 24, true), offset: v.getUint32(at + 42, true) });
+      at += 46 + nlen + v.getUint16(at + 30, true) + v.getUint16(at + 32, true);
+    }
+    return out;
+  }
+
+  async function unzipEntry(b, e) {
+    const v = new DataView(b.buffer, b.byteOffset, b.byteLength);
+    if (e.offset + 30 > b.length || v.getUint32(e.offset, true) !== 0x04034b50) throw new ReportError('bad entry');
+    const start = e.offset + 30 + v.getUint16(e.offset + 26, true) + v.getUint16(e.offset + 28, true);
+    const comp = b.subarray(start, start + e.csize);
+    if (comp.length !== e.csize) throw new ReportError('bad entry');
+    let data;
+    if (e.method === 0) data = comp;
+    else if (e.method === 8) data = await gunzip(comp, 'deflate-raw');
+    else throw new ReportError('bad entry');
+    if (data.length !== e.usize || crc32(data) !== e.crc) throw new ReportError('bad entry');
+    return data;
+  }
+
+  // Each report file in a zip, in name order, as { skip: [label, reason] } or the result of
+  // use(label, bytes); members unpack in parallel, and a bad one is skipped, not fatal
+  async function zipFiles(name, bytes, use) {
+    // __MACOSX holds Finder metadata copies named like the real files
+    const members = zipEntries(bytes).filter((e) => !e.name.endsWith('/') && !e.name.startsWith('__MACOSX/') && SUFFIXES.some((x) => e.name.toLowerCase().endsWith(x)))
+      .sort((a, b) => cmp(a.name, b.name));
+    if (members.length > MAX_ZIP_ENTRIES) throw new ReportError('more than ' + fmt(MAX_ZIP_ENTRIES) + ' report files in one zip');
+    return Promise.all(members.map(async (e) => {
+      const label = name + '/' + e.name;
+      const lower = e.name.toLowerCase();
+      if (lower.endsWith('.zip') || lower.endsWith('.mbox')) return { skip: [label, 'a zip or mailbox inside a zip is not read; unzip it first'] };
+      if (e.flags & 1) return { skip: [label, 'encrypted in the zip'] };
+      if (e.usize > MAX_BYTES) return { skip: [label, 'larger than 10 MB'] };
+      let data;
+      try { data = await unzipEntry(bytes, e); } catch (err) {
+        if (!(err instanceof ReportError)) throw err;
+        return { skip: [label, 'could not be unpacked from the zip'] };
+      }
+      return use(label, data);
+    }));
+  }
+
   // Apple Mail exports a folder "Name.mbox" holding a file named just "mbox"
   const baseName = (name) => name.split('/').pop().toLowerCase();
   const isMbox = (name) => baseName(name) === 'mbox' || baseName(name).endsWith('.mbox');
@@ -365,8 +442,7 @@
     const parsed = new Map();
     const seenKeys = new Map();
 
-    async function add(where, data, mail) {
-      const digest = await sha256(data);
+    function add(where, data, mail, digest) {
       const copy = parsed.has(digest);
       if (!copy) {
         try { parsed.set(digest, parseItems(data)); } catch (e) {
@@ -396,7 +472,45 @@
       });
     }
 
-    for (const { name, bytes } of files) {
+    // [label, report JSON bytes, how it arrived] for each report in one file's bytes
+    async function payloadsOf(name, bytes) {
+      if (bytes.length > MAX_BYTES) throw new ReportError('larger than 10 MB');
+      if (name.toLowerCase().endsWith('.eml')) {
+        const found = await attachments(latin1(bytes), name);
+        if (!found.length) throw new ReportError('no report attachment, which section 8 calls for');
+        return found;
+      }
+      return isGzip(bytes) ? [[name, await gunzip(bytes), null]] : [[name, bytes, null]];
+    }
+
+    // Unpacking and hashing are independent per file, so they run in parallel; the results
+    // are then applied in file order, so the summary never depends on which finished first
+    async function prepare(label, bytes) {
+      try {
+        const payloads = await payloadsOf(label, bytes);
+        return { label, payloads: await Promise.all(payloads.map(async ([w, d, m]) => [w, d, m, await sha256(d)])) };
+      } catch (e) {
+        if (!(e instanceof ReportError)) throw e;
+        return { skip: [label, e.message] };
+      }
+    }
+    const apply = (r) => {
+      if (r.skip) out.skipped.push(r.skip);
+      else for (const [w, d, m, digest] of r.payloads) add(w, d, m, digest);
+    };
+    const ready = await Promise.all(files.map(async ({ name, bytes }) => {
+      if (isMbox(name)) return null;
+      if (!baseName(name).endsWith('.zip')) return prepare(name, bytes);
+      try { return { zip: await zipFiles(name, bytes, prepare) }; } catch (e) {
+        if (!(e instanceof ReportError)) throw e;
+        return { skip: [name, e.message] };
+      }
+    }));
+
+    for (let fi = 0; fi < files.length; fi++) {
+      const { name, bytes } = files[fi];
+      const r = ready[fi];
+      if (r) { if (r.zip) r.zip.forEach(apply); else apply(r); continue; }
       try {
         if (isMbox(name)) {
           // An mbox can be large, so only its attachments are size-checked
@@ -411,19 +525,11 @@
               continue;
             }
             if (!found.length) without++;
-            for (const [w, d, m] of found) await add(w, d, m);
+            for (const [w, d, m] of found) add(w, d, m, await sha256(d));
           }
           if (without) out.skipped.push([name, without + ' message' + (without === 1 ? '' : 's') + ' with no report attached']);
           continue;
         }
-        if (bytes.length > MAX_BYTES) throw new ReportError('larger than 10 MB');
-        let payloads;
-        if (baseName(name).endsWith('.eml')) {
-          payloads = await attachments(latin1(bytes), name);
-          if (!payloads.length) throw new ReportError('no report attachment, which section 8 calls for');
-        } else if (isGzip(bytes)) payloads = [[name, await gunzip(bytes), null]];
-        else payloads = [[name, bytes, null]];
-        for (const [w, d, m] of payloads) await add(w, d, m);
       } catch (e) {
         if (!(e instanceof ReportError)) throw e;
         out.skipped.push([name, e.message]);

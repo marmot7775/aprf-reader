@@ -17,7 +17,7 @@ from .summary import to_dict
 
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="aprf-reader", description="Summarise APRF placement reports.")
-    p.add_argument("paths", nargs="+", type=Path, help="report files (.json, .json.gz, .eml, .mbox) or folders")
+    p.add_argument("paths", nargs="+", type=Path, help="report files (.json, .json.gz, .eml, .mbox, .zip) or folders")
     p.add_argument("--md", type=Path, help="write the summary here instead of printing it")
     p.add_argument("--html", type=Path, help="also write a self-contained HTML page here")
     p.add_argument("--markdown", action="store_true", help="print Markdown with daily tables, even in a terminal")

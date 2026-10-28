@@ -3,6 +3,7 @@
 import gzip
 import json
 import mailbox
+import re
 import shutil
 import subprocess
 from email.message import EmailMessage
@@ -27,11 +28,18 @@ def web(mode: str, paths: list[Path]) -> str:
                           capture_output=True, text=True, env={"APRF_VERSION": __version__}).stdout
 
 
+def _engine(doc: dict) -> dict:
+    """Python and browsers word JSON parse errors differently; compare only our part."""
+    cut = lambda r: r.split(": ", 1)[0] if r.startswith("not valid JSON") else r
+    return {**doc, "skipped": [{**k, "reason": cut(k["reason"])} for k in doc["skipped"]]}
+
+
 def same(paths: list[Path]) -> None:
     loaded = load(paths)
-    assert json.loads(web("--json", paths)) == to_dict(loaded)
-    assert web("--md", paths) == to_markdown(loaded)
-    assert web("--html", paths) == to_html(loaded)
+    assert _engine(json.loads(web("--json", paths))) == _engine(to_dict(loaded))
+    text = lambda t: re.sub(r"(not valid JSON, which section 5 requires): [^\n<]*", r"\1", t)
+    assert text(web("--md", paths)) == text(to_markdown(loaded))
+    assert text(web("--html", paths)) == text(to_html(loaded))
 
 
 def report(day: int, selector: str = "s1", inbox: int = 100) -> dict:
@@ -128,3 +136,35 @@ def test_section_8_checks_the_same(tmp_path):
     assert "attachment name stands in for a character a file name cannot hold, such as / or *" in by_file["safe.eml"]
     assert {"attachment name does not follow section 8", "subject does not follow section 8",
             "attachment Content-Type is not application/json, or application/gzip when compressed"} <= by_file["wrong.eml"]
+
+
+def test_zips_read_the_same(tmp_path):
+    import zipfile
+    raw = lambda day, **kw: json.dumps(report(day, **kw)).encode()
+    z = tmp_path / "reports.zip"
+    with zipfile.ZipFile(z, "w") as f:
+        f.writestr("b/20261002.json", raw(1), compress_type=zipfile.ZIP_DEFLATED)
+        f.writestr("a/20261001.json", raw(0), compress_type=zipfile.ZIP_STORED)
+        f.writestr("c/20261003.json.gz", gzip.compress(raw(2)))
+        f.writestr("d/20261004.eml", email(raw(3), "json", "x.json").as_bytes(), compress_type=zipfile.ZIP_DEFLATED)
+        f.writestr("__MACOSX/a/._20261001.json", b"\x00\x05\x16\x07 Finder junk")
+        f.writestr("e/inner.zip", b"PK nested")
+        f.writestr("e/box.mbox", b"From x\n\nhi\n")
+        f.writestr("f/huge.json", b" " * (11 * 1024 * 1024), compress_type=zipfile.ZIP_DEFLATED)
+        f.writestr("g/notes.txt", b"not a report suffix")
+        f.writestr("h/broken.json", b"{oops", compress_type=zipfile.ZIP_DEFLATED)
+        f.writestr("i/crc.json", raw(5), compress_type=zipfile.ZIP_STORED)
+    # Flip one byte of the stored crc.json so its CRC no longer matches
+    data = bytearray(z.read_bytes())
+    at = data.index(b'"dkim_selector"', data.index(b"i/crc.json") + 10)
+    data[at + 2] ^= 0x01
+    z.write_bytes(bytes(data))
+    (tmp_path / "fake.zip").write_bytes(b"not a zip at all")
+    same([z, tmp_path / "fake.zip"])
+    loaded = load([z, tmp_path / "fake.zip"])
+    assert sorted(r.day.day for r in loaded.reports) == [1, 2, 3, 4]
+    reasons = {w.rsplit("/", 1)[-1]: r for w, r in loaded.skipped}
+    assert reasons["crc.json"] == "could not be unpacked from the zip"
+    assert reasons["inner.zip"] == reasons["box.mbox"] == "a zip or mailbox inside a zip is not read; unzip it first"
+    assert reasons["huge.json"] == "larger than 10 MB" and reasons["fake.zip"] == "not a readable zip file"
+    assert "broken.json" in reasons and not any("MACOSX" in w for w, _ in loaded.skipped)

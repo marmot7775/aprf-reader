@@ -7,6 +7,7 @@ import hashlib
 import io
 import mailbox
 import re
+import zipfile
 import zlib
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
@@ -17,7 +18,9 @@ from pathlib import Path
 
 from .report import Report, ReportError, parse_items
 
-SUFFIXES = (".json", ".json.gz", ".eml", ".mbox")
+SUFFIXES = (".json", ".json.gz", ".eml", ".mbox", ".zip")
+# A zip of a year of daily reports for a few selectors is a few thousand files
+MAX_ZIP_ENTRIES = 20_000
 # A daily report is a few KB; this stops a stray huge file or gzip bomb
 MAX_BYTES = 10 * 1024 * 1024
 
@@ -97,20 +100,50 @@ def _attachments(msg: Message, label: str) -> Iterator[tuple[str, bytes, Mail]]:
             yield where, data, mail(False)
 
 
-def _payloads(path: Path) -> Iterator[tuple[str, bytes, Mail | None]]:
-    """Yield (label, report JSON bytes, how it arrived) for each report in a file."""
-    data = path.read_bytes()
+def _payloads(label: str, data: bytes) -> Iterator[tuple[str, bytes, Mail | None]]:
+    """Yield (label, report JSON bytes, how it arrived) for each report in one file's bytes."""
     if len(data) > MAX_BYTES:
         raise ReportError("larger than 10 MB")
-    if path.name.lower().endswith(".eml"):
-        found = list(_attachments(BytesParser(policy=policy.default).parsebytes(data), str(path)))
+    if label.lower().endswith(".eml"):
+        found = list(_attachments(BytesParser(policy=policy.default).parsebytes(data), label))
         if not found:
             raise ReportError("no report attachment, which section 8 calls for")
         yield from found
     elif data[:2] == b"\x1f\x8b":
-        yield str(path), _gunzip(data), None
+        yield label, _gunzip(data), None
     else:
-        yield str(path), data, None
+        yield label, data, None
+
+
+def _zip(path: Path, out: Loaded) -> Iterator[tuple[str, bytes]]:
+    """Yield (label, bytes) for each report file in a zip, in name order; a bad member is skipped, not fatal."""
+    try:
+        z = zipfile.ZipFile(path)
+    except zipfile.BadZipFile:
+        raise ReportError("not a readable zip file") from None
+    with z:
+        # __MACOSX holds Finder metadata copies named like the real files
+        members = sorted((i for i in z.infolist() if not i.is_dir() and not i.filename.startswith("__MACOSX/")
+                          and i.filename.lower().endswith(SUFFIXES)), key=lambda i: i.filename)
+        if len(members) > MAX_ZIP_ENTRIES:
+            raise ReportError(f"more than {MAX_ZIP_ENTRIES:,} report files in one zip")
+        for i in members:
+            label = f"{path}/{i.filename}"
+            name = i.filename.lower()
+            if name.endswith((".zip", ".mbox")):
+                out.skipped.append((label, "a zip or mailbox inside a zip is not read; unzip it first"))
+            elif i.flag_bits & 1:
+                out.skipped.append((label, "encrypted in the zip"))
+            elif i.file_size > MAX_BYTES:
+                out.skipped.append((label, "larger than 10 MB"))
+            else:
+                try:
+                    with z.open(i) as f:
+                        data = f.read(MAX_BYTES + 1)
+                except (zipfile.BadZipFile, NotImplementedError, zlib.error, EOFError, OSError):
+                    out.skipped.append((label, "could not be unpacked from the zip"))
+                    continue
+                yield label, data
 
 
 def _mbox(path: Path, out: Loaded) -> Iterator[tuple[str, bytes, Mail | None]]:
@@ -232,8 +265,16 @@ def load(paths: Iterable[Path]) -> Loaded:
 
     for path in _files(paths):
         try:
+            if path.name.lower().endswith(".zip"):
+                for label, data in _zip(path, out):
+                    try:
+                        for where, d, mail in list(_payloads(label, data)):
+                            add(where, d, mail)
+                    except (OSError, EOFError, zlib.error, ReportError) as e:
+                        out.skipped.append((label, str(e)))
+                continue
             # An mbox can be large, so it is read one message at a time
-            payloads = _mbox(path, out) if _is_mbox(path) else list(_payloads(path))
+            payloads = _mbox(path, out) if _is_mbox(path) else list(_payloads(str(path), path.read_bytes()))
             for where, data, mail in payloads:
                 add(where, data, mail)
         except (OSError, EOFError, zlib.error, ReportError) as e:

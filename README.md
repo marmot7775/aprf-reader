@@ -11,7 +11,7 @@ Two ways to use it, with the same results:
   your reports on the page. They are read on your computer and never uploaded.
 - **On the command line:** `pipx install aprf-reader`.
 
-**Status: 0.4, beta.** Reads reports in the format of draft-ietf-mailmaint-aprf-00.
+**Status: 0.5, beta.** Reads reports in the format of draft-ietf-mailmaint-aprf-00.
 
 ## What APRF is
 
@@ -46,7 +46,7 @@ the changes worth a look. Piped or written to a file with `--md`, the output
 is Markdown with the full daily tables.
 
 Point it at report files (`.json`, `.json.gz`), saved report emails (`.eml`),
-mailbox exports (`.mbox`), or folders of them. The easiest way to collect reports
+mailbox exports (`.mbox`), `.zip` files of any of those, or folders of them. The easiest way to collect reports
 is a mail filter that moves them into one folder, then an export of that folder:
 Gmail through [Google Takeout](https://takeout.google.com/) (pick Mail and the
 label), Thunderbird with the ImportExportTools NG add-on, or Apple Mail's
@@ -65,7 +65,7 @@ to mark a change in what a category counts.
 
 ## What it does
 
-- Read report files (`.json`, `.json.gz`, `.eml` and `.mbox`) or a folder of them, and skip
+- Read report files (`.json`, `.json.gz`, `.eml`, `.mbox` and `.zip`) or a folder of them, and skip
   duplicates and files it cannot read, with a reason for each.
 - Summarise placement per signing domain and selector: inbox, unwanted and
   recipient reactions, by day and as a trend.
