@@ -1,0 +1,78 @@
+# Publish to PyPI when a v* tag is pushed, then make the GitHub release.
+# Trusted publishing: no token. PyPI's publisher for aprf-reader names this repo,
+# workflow publish.yml and environment pypi. The tag must match pyproject's version.
+
+name: Publish
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Test
+        run: |
+          pip install -e '.[dev]'
+          pytest -q
+      - name: Build
+        run: |
+          pip install build
+          python -m build
+      - name: Check the version is the tag's
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          ls dist
+          test -f "dist/aprf_reader-${version}.tar.gz"
+          test -f "dist/aprf_reader-${version}-py3-none-any.whl"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: pypi
+      url: https://pypi.org/p/aprf-reader
+    permissions:
+      id-token: write  # trusted publishing
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          attestations: true
+
+  release:
+    needs: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write  # create the release
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - name: Create the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "$GITHUB_REF_NAME" dist/*
+          --repo "$GITHUB_REPOSITORY"
+          --title "aprf-reader ${GITHUB_REF_NAME#v}"
+          --generate-notes

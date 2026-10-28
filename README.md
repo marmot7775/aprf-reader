@@ -23,7 +23,7 @@ what they don't](https://dns-audit.com/articles/aprf).
 Python 3.11 or later, no other dependencies.
 
 ```bash
-pip install git+https://github.com/marmot7775/aprf-reader
+pip install aprf-reader
 aprf-reader reports/                      # Markdown summary to the terminal
 aprf-reader reports/ --html summary.html  # and a page you can open or share
 ```
