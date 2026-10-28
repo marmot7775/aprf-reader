@@ -115,7 +115,7 @@ def _counts(value: object, where: str, section: str) -> dict[str, int]:
     for name, n in value.items():
         k = _int(n)
         if k is None or k < 0 or k > MAX_COUNT:
-            raise ReportError(f"{where}.{name} is not a count ({section}): {json.dumps(n, ensure_ascii=False, separators=(",", ":"))}")
+            raise ReportError(f"{where}.{name} is not a count ({section}): {json.dumps(n, ensure_ascii=False, separators=(',', ':'))}")
         out[str(name)] = k
     return out
 
@@ -194,7 +194,7 @@ def _warnings(h: dict, segments: tuple[Segment, ...]) -> tuple[tuple[str, str], 
         raw = h["sdi_used"]
         if not (raw in ("N/A", "N/F") or (isinstance(raw, str) and SDI_FORMAT.fullmatch(raw))):
             out.append(("sdi_used is not N/A, N/F, or the sdi value as published in DNS (section 5.2.1)",
-                        json.dumps(raw, ensure_ascii=False, separators=(",", ":"))))
+                        json.dumps(raw, ensure_ascii=False, separators=(',', ':'))))
     keys = lambda attr: sorted({k for s in segments for k in getattr(s, attr)})
     for k in keys("classification"):
         if k not in NAMED_CLASSIFICATION:
