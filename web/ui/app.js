@@ -67,9 +67,23 @@
       status('');
       current = { loaded, sample: label === 'sample' };
       render();
+      note(loaded, label === 'sample');
     } catch (e) {
       status('Something went wrong reading those files: ' + e.message, true);
     }
+  }
+
+  // One usage note per run to dns-audit.com, so its owner can see the page is used.
+  // Counts and signing domains only, never report contents (see the privacy page).
+  // text/plain needs no CORS preflight; the reply is not read, and a failure is ignored.
+  function note(loaded, sample) {
+    const ss = APRF.streams(loaded.reports);
+    const domains = [...new Set(ss.map((x) => x.domain))].slice(0, 20);
+    const body = { tool: 'aprf-reader', reports: loaded.reports.length, streams: ss.length,
+      warnings: loaded.warnings.length, skipped: loaded.skipped.length, copies: loaded.copies, domains, sample };
+    try {
+      fetch('https://dns-audit.com/api/usage', { method: 'POST', mode: 'no-cors', keepalive: true, headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(body) }).catch(() => {});
+    } catch (e) { /* never let the note break the page */ }
   }
 
   // A dropped folder is walked like the command line walks one: report suffixes only

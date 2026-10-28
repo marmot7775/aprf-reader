@@ -8,7 +8,8 @@ points out the days worth a look, such as a jump in unwanted mail.
 Two ways to use it, with the same results:
 
 - **In your browser:** [aprf.dns-audit.com](https://aprf.dns-audit.com). Drop
-  your reports on the page. They are read on your computer and never uploaded.
+  your reports on the page. They are read in your browser, not uploaded. The
+  page sends dns-audit.com a one-line usage note: counts and signing domains.
 - **On the command line:** `pipx install aprf-reader`.
 
 **Status: 0.5, beta.** Reads reports in the format of draft-ietf-mailmaint-aprf-00.
@@ -72,7 +73,7 @@ to mark a change in what a category counts.
 - Treat the counts as what the draft says they are: rounded into buckets, so
   they are a signal, not exact rates.
 - Write a Markdown summary and a single self-contained HTML page you can open
-  or share. Nothing is uploaded anywhere.
+  or share. The command line tool sends nothing anywhere.
 - Follow the draft as it changes. The report format lives in one module
   (`src/aprf_reader/report.py`), so a new draft revision is a small update.
 - Check each report against the draft and skip, with the reason, any it
@@ -139,8 +140,8 @@ repeats a report already read, such as the same report as `.json` and as
 emails, forwarded emails, mailbox exports, duplicates and hostile text) and
 requires the same JSON, Markdown and HTML output, so the page and the command
 line cannot drift apart. `node web/build.js` inlines everything into one
-`web/dist/index.html` whose Content Security Policy blocks every network
-request, so it also works saved to disk. A merge to main that passes the
+`web/dist/index.html` whose Content Security Policy allows one connection, the
+usage note to dns-audit.com, and it also works saved to disk. A merge to main that passes the
 tests deploys it to Cloudflare.
 
 ## Related
