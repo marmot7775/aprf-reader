@@ -249,7 +249,7 @@ def test_stress_set_one_bad_report_does_not_cost_the_file():
     dup = {where.rsplit(" ", 1)[-1]: d for w, d, where in loaded.warnings if w.startswith("the same day came twice")}
     assert dup["64"] == f"{FIX}/stress_100.json report 63 kept, version 1 kept, version 2 dropped"
     assert dup["69"].endswith("report 68 kept, with different counts")  # bücher.example
-    assert "report 3 kept" in dup["70"]  # DNS-AUDIT.COM / SELECTOR1 is dns-audit.com / selector1
+    assert "report 3 kept" in dup["70"]  # SENDER.EXAMPLE / SELECTOR1 is sender.example / selector1
     assert not {"64", "69", "70"} & set(reasons)
     warned = {w for w, _, _ in loaded.warnings}
     assert "sdi_used is not N/A, N/F, or the sdi value as published in DNS (section 5.2.1)" in warned
@@ -259,13 +259,13 @@ def test_stress_set_one_bad_report_does_not_cost_the_file():
     assert reasons["79"] == "header.report_end is before report_start (section 5.1)"
     assert reasons["81"].startswith("header.report_start looks like milliseconds")
     ss = {(s.source, s.domain, s.selector): s for s in streams(loaded.reports)}
-    assert ("Big MBP Co", "dns-audit.com", "s11") in ss  # another provider, same day: its own stream
+    assert ("Big MBP Co", "sender.example", "s11") in ss  # another provider, same day: its own stream
     obj = report(0)
     obj["body"][0]["classification"]["unwanted"] = 100.0
     assert parse(json.dumps(obj).encode())[0].segments[0].classification["unwanted"] == 100
     for sel in ("sdi0", "sdi1", "sdi2", "sdi3", "sdi4"):  # n/a, "N/A ", "", null, N/F;
-        assert not ss[("Comcast/Xfinity", "dns-audit.com", sel)].notes, sel
-    blank = ss[("Comcast/Xfinity", "dns-audit.com", "s13")]
+        assert not ss[("Comcast/Xfinity", "sender.example", sel)].notes, sel
+    blank = ss[("Comcast/Xfinity", "sender.example", "s13")]
     assert "(blank)" in [r.segment for r in blank.rows]
-    assert not ss[("Comcast/Xfinity", "dns-audit.com", "s8")].columns
+    assert not ss[("Comcast/Xfinity", "sender.example", "s8")].columns
     assert "These reports carry no counts." in to_markdown(loaded)
