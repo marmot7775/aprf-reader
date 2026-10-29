@@ -91,8 +91,7 @@ button { font: inherit; cursor: pointer; }
 .btn.primary:hover { background: var(--primary-solid-hover); }
 .btn svg { width: 16px; height: 16px; flex: none; }
 .link-btn { background: none; border: 0; padding: 6px 4px; min-height: 44px; color: var(--primary); font-size: var(--font-sm); font-weight: 500; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--primary-border); }
-.paste summary { cursor: pointer; font-weight: 600; font-size: var(--font-sm); color: var(--primary); min-height: 44px; display: inline-flex; align-items: center; }
-.paste textarea { display: block; width: 100%; margin: 4px 0 8px; font-family: var(--font-mono); font-size: var(--font-sm); line-height: 1.5; border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px; background: var(--code-bg); color: var(--text); resize: vertical; }
+.paste textarea { display: block; width: 100%; margin: 12px 0 8px; font-family: var(--font-mono); font-size: var(--font-sm); line-height: 1.5; border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px; background: var(--code-bg); color: var(--text); resize: vertical; }
 .status { margin: 0; font-size: var(--font-sm); color: var(--text-2); min-height: 1.6em; }
 .status.error { color: var(--caveat); }
 
@@ -202,12 +201,11 @@ tr:last-child td { border-bottom: 0; }
       <strong>Drop report files or a folder here, or paste</strong>
       <p>Report files (<code>.json</code>, <code>.json.gz</code>), saved report emails (<code>.eml</code>), a mailbox export (<code>.mbox</code>), or a <code>.zip</code> of any of them. Copies are counted once.</p>
     </div>
-    <details class="paste" id="paste">
-      <summary>Paste a report instead</summary>
+    <div class="paste" id="paste">
       <label for="paste-box" class="sr-only">Report to read</label>
       <textarea id="paste-box" rows="5" spellcheck="false" placeholder="Paste a report's JSON, or a whole report email. In Gmail: open the email, then More, Show original, Copy to clipboard."></textarea>
       <button class="btn primary" type="button" id="paste-read">Read it</button>
-    </details>
+    </div>
     <div class="actions">
       <button class="btn primary" type="button" id="pick-files">Choose files</button>
       <button class="btn" type="button" id="pick-folder">Choose a folder</button>
