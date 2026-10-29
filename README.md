@@ -11,7 +11,7 @@ Two ways to use it, with the same results:
   paste your reports on the page.
 - **On the command line:** `pipx install aprf-reader`.
 
-**Status: 0.5, beta.** Reads reports in the format of draft-ietf-mailmaint-aprf-00.
+**Status: 0.6, beta.** Reads reports in the format of draft-ietf-mailmaint-aprf-00.
 
 ## What APRF is
 
@@ -38,6 +38,7 @@ aprf-reader APRF.mbox                     # a mail folder exported as mbox
 aprf-reader reports/ --markdown           # Markdown with daily tables
 aprf-reader reports/ --html summary.html  # and a page you can open or share
 aprf-reader reports/ --json               # the summary as data, for scripts
+aprf-reader --imap imap.gmail.com --user you@gmail.com --folder APRF
 ```
 
 In a terminal you get an overview: for each stream, each count's latest value,
@@ -51,7 +52,21 @@ is a mail filter that moves them into one folder, then an export of that folder:
 Gmail through [Google Takeout](https://takeout.google.com/) (pick Mail and the
 label), Thunderbird with the ImportExportTools NG add-on, or Apple Mail's
 Mailbox > Export Mailbox. Comcast's reports come from
-`aprf-noreply@alerts.xfinity.com` with subjects starting `APRF:`. Folders are searched recursively. Files it skips are listed
+`aprf-noreply@alerts.xfinity.com` with subjects starting `APRF:`. Folders are searched recursively.
+
+Or skip the export and read the folder straight from your mailbox over IMAP:
+
+```bash
+aprf-reader --imap imap.gmail.com --user you@gmail.com --folder APRF --since 2026-10-01
+```
+
+It opens the folder read-only and fetches with `BODY.PEEK`, so nothing is
+marked read, moved or deleted. It reads messages whose subject contains
+`APRF:`; `--all-mail` reads every message in the folder. The password comes
+from the `APRF_IMAP_PASSWORD` environment variable, or it asks. Gmail and
+Outlook.com need an app password, not your account password, and a Gmail
+label is read as a folder of the same name. The connection uses TLS on port
+993; give another port as `--imap host:port`. Files it skips are listed
 on stderr and at the end of the summary, each with a reason.
 
 Each stream (provider, signing domain, selector) gets a table with one row per
@@ -65,14 +80,16 @@ to mark a change in what a category counts.
 
 ## What it does
 
-- Read report files (`.json`, `.json.gz`, `.eml`, `.mbox` and `.zip`) or a folder of them, and skip
+- Read report files (`.json`, `.json.gz`, `.eml`, `.mbox` and `.zip`), a folder of them, or a
+  mailbox folder over IMAP, and skip
   duplicates and files it cannot read, with a reason for each.
 - Summarise placement per signing domain and selector: inbox, unwanted and
   recipient reactions, by day and as a trend.
 - Treat the counts as what the draft says they are: rounded into buckets, so
   they are a signal, not exact rates.
 - Write a Markdown summary and a single self-contained HTML page you can open
-  or share. The command line tool sends nothing anywhere.
+  or share. The command line tool sends nothing anywhere; with `--imap` it
+  only talks to the mail server you name.
 - Follow the draft as it changes. The report format lives in one module
   (`src/aprf_reader/report.py`), so a new draft revision is a small update.
 - Check each report against the draft and skip, with the reason, any it
