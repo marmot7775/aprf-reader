@@ -311,7 +311,8 @@
     const stamp = new Date().toISOString().slice(0, 10);
     const copyBtn = h('button', { class: 'btn', type: 'button', onclick: (e) => copy(APRF.toMarkdown(loaded, VERSION), e.currentTarget) }, icon(ICON.copy), h('span', {}, 'Copy summary'));
     const out = $('results');
-    out.replaceChildren(
+    // replaceChildren turns a null into the text null, so drop the optional parts first
+    out.replaceChildren(...[
       h('div', { class: 'toolbar' },
         h('div', {}, h('h2', { id: 'results-title', tabindex: '-1' }, 'Summary'), h('p', {}, APRF.plural(loaded.reports.length, 'report') + ' in ' + APRF.plural(ss.length, 'stream') + ', ' + range(first, last))),
         h('div', { class: 'actions' },
@@ -324,7 +325,8 @@
       ...ss.map(streamCard),
       review(loaded),
       loaded.skipped.length ? h('section', { class: 'card skipped' }, h('p', { class: 'eyebrow' }, 'Skipped, ' + loaded.skipped.length), h('ul', {}, loaded.skipped.map(([w, r]) => h('li', {}, h('span', { class: 'mono' }, w), ': ' + r)))) : null,
-      loaded.copies ? h('p', { class: 'caveat-note' }, APRF.copiesLine(loaded.copies)) : null);
+      loaded.copies ? h('p', { class: 'caveat-note' }, APRF.copiesLine(loaded.copies)) : null,
+    ].filter(Boolean));
     out.hidden = false;
     $('results-title').focus({ preventScroll: true });
     out.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
