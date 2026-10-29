@@ -91,7 +91,10 @@ button { font: inherit; cursor: pointer; }
 .btn.primary:hover { background: var(--primary-solid-hover); }
 .btn svg { width: 16px; height: 16px; flex: none; }
 .link-btn { background: none; border: 0; padding: 6px 4px; min-height: 44px; color: var(--primary); font-size: var(--font-sm); font-weight: 500; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--primary-border); }
-.paste textarea { display: block; width: 100%; margin: 12px 0 8px; font-family: var(--font-mono); font-size: var(--font-sm); line-height: 1.5; border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px; background: var(--code-bg); color: var(--text); resize: vertical; }
+/* Drop zone and paste box side by side when there is room, so both sit above the fold */
+.intake { display: grid; gap: 12px; }
+@media (min-width: 760px) { .intake { grid-template-columns: 1fr 1fr; align-items: stretch; } .paste { display: flex; flex-direction: column; } .paste textarea { flex: 1; min-height: 120px; margin-top: 0 !important; } .paste .btn { align-self: flex-start; } }
+.paste textarea { display: block; width: 100%; margin: 0 0 8px; font-family: var(--font-mono); font-size: var(--font-sm); line-height: 1.5; border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px; background: var(--code-bg); color: var(--text); resize: vertical; }
 .status { margin: 0; font-size: var(--font-sm); color: var(--text-2); min-height: 1.6em; }
 .status.error { color: var(--caveat); }
 
@@ -196,6 +199,7 @@ tr:last-child td { border-bottom: 0; }
     <div class="input-head">
       <h2 id="input-title">Your reports</h2>
     </div>
+    <div class="intake">
     <div class="drop" id="drop">
       <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 21V7m0 0-5 5m5-5 5 5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 20v4a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
       <strong>Drop report files or a folder here, or paste</strong>
@@ -205,6 +209,7 @@ tr:last-child td { border-bottom: 0; }
       <label for="paste-box" class="sr-only">Report to read</label>
       <textarea id="paste-box" rows="5" spellcheck="false" placeholder="Paste a report's JSON, or a whole report email. In Gmail: open the email, then More, Show original, Copy to clipboard."></textarea>
       <button class="btn primary" type="button" id="paste-read">Read it</button>
+    </div>
     </div>
     <div class="actions">
       <button class="btn primary" type="button" id="pick-files">Choose files</button>
