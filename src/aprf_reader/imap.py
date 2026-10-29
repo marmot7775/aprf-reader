@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import imaplib
 import re
+import ssl
 from collections.abc import Iterator
 from datetime import date
 
@@ -26,6 +27,12 @@ def _check(typ: str, data: list, what: str) -> list:
     return data
 
 
+def _text(e: Exception) -> str:
+    # imaplib puts the server's reply bytes in the exception as they came
+    a = e.args[0] if e.args else ""
+    return a.decode(errors="replace") if isinstance(a, bytes) else str(e)
+
+
 def _quote(s: str) -> str:
     return '"' + s.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
@@ -43,16 +50,17 @@ def fetch(host: str, user: str, password: str, folder: str = "INBOX", port: int 
 
     The folder is opened read-only and bodies are fetched with BODY.PEEK, so no
     message is marked read, moved or deleted."""
-    m = conn or imaplib.IMAP4_SSL(host, port, timeout=60)
+    # imaplib's own default context checks neither the certificate nor the host name
+    m = conn or imaplib.IMAP4_SSL(host, port, ssl_context=ssl.create_default_context(), timeout=60)
     try:
         try:
             _check(*m.login(user, password), "login")
         except imaplib.IMAP4.error as e:
-            raise ImapError(f"login failed: {e}") from None
+            raise ImapError(f"login failed: {_text(e)}") from None
         try:
             _check(*m.select(_quote(folder), readonly=True), f"opening folder {folder}")
         except imaplib.IMAP4.error as e:
-            raise ImapError(f"opening folder {folder} failed: {e}") from None
+            raise ImapError(f"opening folder {folder} failed: {_text(e)}") from None
         (ids,) = _check(*m.uid("SEARCH", *criteria(since, every)), "search")
         uids = (ids or b"").split()
         if len(uids) > MAX_MESSAGES:

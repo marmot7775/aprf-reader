@@ -66,7 +66,7 @@ marked read, moved or deleted. It reads messages whose subject contains
 from the `APRF_IMAP_PASSWORD` environment variable, or it asks. Gmail and
 Outlook.com need an app password, not your account password, and a Gmail
 label is read as a folder of the same name. The connection uses TLS on port
-993; give another port as `--imap host:port`. Files it skips are listed
+993 and checks the server's certificate; give another port as `--imap host:port`. Files it skips are listed
 on stderr and at the end of the summary, each with a reason.
 
 Each stream (provider, signing domain, selector) gets a table with one row per
