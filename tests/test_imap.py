@@ -1,6 +1,7 @@
 import gzip
 import imaplib
 import json
+import ssl
 from datetime import date
 
 import pytest
@@ -87,7 +88,7 @@ def test_fetched_mail_read_like_an_mbox():
 
 def test_cli_imap(monkeypatch, capsys):
     fake = FakeImap(mails(2))
-    monkeypatch.setattr(imaplib, "IMAP4_SSL", lambda host, port, timeout: fake)
+    monkeypatch.setattr(imaplib, "IMAP4_SSL", lambda host, port, ssl_context, timeout: fake)
     monkeypatch.setenv("APRF_IMAP_PASSWORD", "right")
     assert cli.main(["--imap", "imap.example.com", "--user", "u", "--folder", "APRF", "--json"]) == 0
     out, err = capsys.readouterr()
@@ -96,10 +97,22 @@ def test_cli_imap(monkeypatch, capsys):
 
 
 def test_cli_imap_failure_and_usage(monkeypatch, capsys):
-    monkeypatch.setattr(imaplib, "IMAP4_SSL", lambda host, port, timeout: FakeImap({}))
+    monkeypatch.setattr(imaplib, "IMAP4_SSL", lambda host, port, ssl_context, timeout: FakeImap({}))
     monkeypatch.setenv("APRF_IMAP_PASSWORD", "wrong")
     assert cli.main(["--imap", "h", "--user", "u"]) == 2
     assert "login failed" in capsys.readouterr().err
     for argv in ([], ["--imap", "h"], ["--imap", "h:x", "--user", "u"]):
         with pytest.raises(SystemExit):
             cli.main(argv)
+
+
+def test_certificate_is_checked(monkeypatch):
+    seen = {}
+
+    def connect(host, port, ssl_context, timeout):
+        seen["ctx"] = ssl_context
+        return FakeImap({})
+
+    monkeypatch.setattr(imaplib, "IMAP4_SSL", connect)
+    list(fetch("h", "u", "right"))
+    assert seen["ctx"].verify_mode == ssl.CERT_REQUIRED and seen["ctx"].check_hostname
