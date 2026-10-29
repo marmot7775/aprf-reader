@@ -24,7 +24,9 @@ const TITLE = 'APRF Report Reader: your inbox placement, from the provider\'s ow
 const DESCRIPTION = 'Free APRF report reader. See whether your mail reaches the inbox, from the mailbox provider\'s own numbers: inbox and unwanted counts day by day, what changed, and a check against the draft standard. Free, no sign-up.';
 const ICON = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#2f5fcc"/><path d="M7 23l6-7 5 4 7-10" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>');
 
-const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8');
+// Line endings are normalized because the browser hashes inline scripts with LF only;
+// a Windows checkout with CRLF would otherwise ship a page whose CSP blocks its own script
+const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8').replace(/\r\n?/g, '\n');
 const attr = (s) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 const plain = (html) => html.replace(/<[^>]+>/g, '').replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
 
