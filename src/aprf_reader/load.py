@@ -232,9 +232,16 @@ def pasted_name(data: bytes) -> str:
     return "pasted.json.gz" if data[:2] == b"\x1f\x8b" else "pasted.eml"
 
 
-def load(paths: Iterable[Path], pasted: bytes | None = None) -> Loaded:
+def _message(label: str, data: bytes) -> list[tuple[str, bytes, Mail]]:
+    """Reports in one raw email fetched from a mailbox; mail with none is counted, not skipped."""
+    if len(data) > MAX_BYTES:
+        raise ReportError("larger than 10 MB")
+    return list(_attachments(BytesParser(policy=policy.default).parsebytes(data), label))
+
+
+def load(paths: Iterable[Path], pasted: bytes | None = None,
+         messages: Iterable[tuple[str, bytes]] = (), source: str = "mailbox") -> Loaded:
     out = Loaded()
-    seen_bytes: set[str] = set()
     seen_keys: dict[tuple, tuple[str, Report]] = {}
 
     parsed: dict[str, list | ReportError] = {}
@@ -288,6 +295,19 @@ def load(paths: Iterable[Path], pasted: bytes | None = None) -> Loaded:
                 add(where, data, mail)
         except (OSError, EOFError, zlib.error, ReportError) as e:
             out.skipped.append((str(path), str(e)))
+    # Raw emails from IMAP, read like an mbox: one line for all mail with no report
+    without = 0
+    for label, data in messages:
+        try:
+            found = _message(label, data)
+        except (OSError, EOFError, zlib.error, ReportError) as e:
+            out.skipped.append((label, str(e)))
+            continue
+        without += not found
+        for where, d, mail in found:
+            add(where, d, mail)
+    if without:
+        out.skipped.append((source, f"{without} message{'s' if without != 1 else ''} with no report attached"))
     if pasted is not None:
         name = pasted_name(pasted)
         try:
