@@ -365,11 +365,14 @@
   $('sample').addEventListener('click', () => run([{ name: 'sample.json', file: new Blob([window.APRF_SAMPLE]) }], 'sample'));
 
   const zone = $('input');
+  // Text dragged onto the paste box goes into the box, as the browser does by itself
+  const textIntoBox = (e) => e.target.closest && e.target.closest('textarea') && !Array.from(e.dataTransfer.types).includes('Files');
   let depth = 0;
   zone.addEventListener('dragenter', (e) => { e.preventDefault(); depth++; zone.classList.add('over'); });
   zone.addEventListener('dragleave', () => { if (--depth <= 0) { depth = 0; zone.classList.remove('over'); } });
-  zone.addEventListener('dragover', (e) => e.preventDefault());
+  zone.addEventListener('dragover', (e) => { if (!textIntoBox(e)) e.preventDefault(); });
   zone.addEventListener('drop', async (e) => {
+    if (textIntoBox(e)) { depth = 0; zone.classList.remove('over'); return; }
     e.preventDefault();
     depth = 0;
     zone.classList.remove('over');
