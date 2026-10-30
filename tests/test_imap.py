@@ -32,6 +32,10 @@ class FakeImap:
             return "NO", [b"[NONEXISTENT] Unknown Mailbox"]
         return "OK", [str(len(self.messages)).encode()]
 
+    def authenticate(self, mech, cb):
+        self.calls.append(("authenticate", mech, cb(b"")))
+        return "OK", [b"logged in"]
+
     def uid(self, command, *args):
         self.calls.append((command, *args))
         if command == "SEARCH":
@@ -39,7 +43,10 @@ class FakeImap:
         out = []
         for u in args[0].split(","):
             body = self.messages[int(u)]
-            out += [(f"{u} (UID {u} RFC822.SIZE {len(body)} BODY[] {{{len(body)}}}".encode(), body), b")"]
+            if "BODY" not in args[1]:
+                out.append(f"{u} (UID {u} RFC822.SIZE {len(body)})".encode())
+            else:
+                out += [(f"{u} (UID {u} BODY[] {{{len(body)}}}".encode(), body), b")"]
         return "OK", out
 
     def logout(self):
@@ -60,7 +67,7 @@ def test_fetch_is_read_only_and_batched(monkeypatch):
     got = list(fetch("imap.example.com", "u", "right", "APRF", conn=fake))
     assert [label for label, _ in got] == [f"imap://imap.example.com/APRF uid {u}" for u in range(100, 105)]
     assert ("select", '"APRF"', True) in fake.calls  # EXAMINE, not SELECT
-    fetches = [c for c in fake.calls if c[0] == "FETCH"]
+    fetches = [c for c in fake.calls if c[0] == "FETCH" and "BODY" in c[2]]
     assert len(fetches) == 3 and all("BODY.PEEK[]" in c[2] for c in fetches)  # PEEK leaves \\Seen alone
     assert fake.calls[-1] == ("logout",)
 
@@ -116,3 +123,52 @@ def test_certificate_is_checked(monkeypatch):
     monkeypatch.setattr(imaplib, "IMAP4_SSL", connect)
     list(fetch("h", "u", "right"))
     assert seen["ctx"].verify_mode == ssl.CERT_REQUIRED and seen["ctx"].check_hostname
+
+
+def test_huge_message_not_downloaded(monkeypatch):
+    monkeypatch.setattr(imap, "MAX_BYTES", 1000)
+    msgs = mails(1)
+    msgs[200] = b"x" * 2000
+    fake = FakeImap(msgs)
+    got = dict(fetch("h", "u", "right", conn=fake))
+    assert got["imap://h/INBOX uid 200"] is None and got["imap://h/INBOX uid 100"]
+    assert all("200" not in c[1] for c in fake.calls if c[0] == "FETCH" and "BODY" in c[2])
+    loaded = load([], None, got.items())
+    assert loaded.skipped == [("imap://h/INBOX uid 200", "larger than 10 MB")]
+
+
+def test_connection_lost_mid_run_is_a_clean_error(monkeypatch, capsys):
+    fake = FakeImap(mails(2))
+
+    def hang_up(*a):
+        raise imaplib.IMAP4.abort("socket error: EOF")
+
+    fake.uid = hang_up
+    with pytest.raises(ImapError, match="connection lost: socket error: EOF"):
+        list(fetch("h", "u", "right", conn=fake))
+    monkeypatch.setattr(imaplib, "IMAP4_SSL", lambda host, port, ssl_context, timeout: fake)
+    monkeypatch.setenv("APRF_IMAP_PASSWORD", "right")
+    assert cli.main(["--imap", "h", "--user", "u"]) == 2
+    assert "connection lost" in capsys.readouterr().err
+
+
+def test_non_ascii_folder_and_password():
+    assert imap.utf7("Gelöschte Elemente") == "Gel&APY-schte Elemente"
+    assert imap.utf7("日本語") == "&ZeVnLIqe-"  # the RFC 3501 example
+    assert imap.utf7("A&B") == "A&-B"
+    fake = FakeImap({}, folders=("Gel&APY-schte Elemente",))
+    list(fetch("h", "u", "sécret", "Gelöschte Elemente", conn=fake))
+    assert ("authenticate", "PLAIN", "\0u\0sécret".encode()) in fake.calls
+    assert ("select", '"Gel&APY-schte Elemente"', True) in fake.calls
+
+
+def test_no_terminal_for_the_password(monkeypatch, capsys):
+    monkeypatch.delenv("APRF_IMAP_PASSWORD", raising=False)
+
+    def no_tty(prompt):
+        raise EOFError
+
+    monkeypatch.setattr(cli.getpass, "getpass", no_tty)
+    with pytest.raises(SystemExit):
+        cli.main(["--imap", "h", "--user", "u"])
+    assert "set APRF_IMAP_PASSWORD" in capsys.readouterr().err

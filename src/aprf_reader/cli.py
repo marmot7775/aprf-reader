@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import getpass
+import imaplib
 import json
 import os
 import shutil
@@ -49,11 +50,20 @@ def main(argv: list[str] | None = None) -> int:
         host, _, port = args.imap.partition(":")
         if port and not port.isdigit():
             p.error(f"--imap port is not a number: {port}")
-        password = os.environ.get("APRF_IMAP_PASSWORD") or getpass.getpass(f"IMAP password for {args.user}: ")
+        password = os.environ.get("APRF_IMAP_PASSWORD")
+        if not password:
+            if pasted is not None:
+                p.error("stdin is the pasted report, so the password must come from APRF_IMAP_PASSWORD")
+            try:
+                password = getpass.getpass(f"IMAP password for {args.user}: ")
+            except (EOFError, KeyboardInterrupt):
+                print(file=sys.stderr)
+                p.error("no password: set APRF_IMAP_PASSWORD or run it in a terminal")
         try:
             # Fetched in full before reading, so a dropped connection leaves no half summary
             messages = list(fetch(host, args.user, password, args.folder, int(port or 993), args.since, args.all_mail))
-        except (ImapError, OSError) as e:
+        # imaplib.IMAP4.error and UnicodeError are a backstop; fetch() turns what it can into ImapError
+        except (ImapError, imaplib.IMAP4.error, OSError, UnicodeError) as e:
             print(f"aprf-reader: {args.imap}: {e}", file=sys.stderr)
             return 2
         print(f"read {len(messages)} message{'s' if len(messages) != 1 else ''} from {args.folder} on {host}", file=sys.stderr)

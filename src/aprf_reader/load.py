@@ -232,15 +232,16 @@ def pasted_name(data: bytes) -> str:
     return "pasted.json.gz" if data[:2] == b"\x1f\x8b" else "pasted.eml"
 
 
-def _message(label: str, data: bytes) -> list[tuple[str, bytes, Mail]]:
-    """Reports in one raw email fetched from a mailbox; mail with none is counted, not skipped."""
-    if len(data) > MAX_BYTES:
+def _message(label: str, data: bytes | None) -> list[tuple[str, bytes, Mail]]:
+    """Reports in one raw email fetched from a mailbox; mail with none is counted, not skipped.
+    None is a message too large to have been downloaded."""
+    if data is None or len(data) > MAX_BYTES:
         raise ReportError("larger than 10 MB")
     return list(_attachments(BytesParser(policy=policy.default).parsebytes(data), label))
 
 
 def load(paths: Iterable[Path], pasted: bytes | None = None,
-         messages: Iterable[tuple[str, bytes]] = (), source: str = "mailbox") -> Loaded:
+         messages: Iterable[tuple[str, bytes | None]] = (), source: str = "mailbox") -> Loaded:
     out = Loaded()
     seen_keys: dict[tuple, tuple[str, Report]] = {}
 
