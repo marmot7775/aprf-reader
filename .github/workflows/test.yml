@@ -62,4 +62,9 @@ jobs:
       - name: Check the live page
         run: |
           version=$(sed -n 's/^version = "\(.*\)"/\1/p' pyproject.toml)
-          curl -sf https://aprf.dns-audit.com/ | grep -q "APRF_VERSION = \"$version\""
+          # Cloudflare can take a few seconds to serve a new deploy everywhere
+          for i in $(seq 12); do
+            curl -sf "https://aprf.dns-audit.com/?check=$GITHUB_RUN_ID-$i" | grep -q "APRF_VERSION = \"$version\"" && exit 0
+            sleep 5
+          done
+          echo "live page does not show $version after 60 seconds"; exit 1
