@@ -35,7 +35,9 @@ const ICON = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.
 // build() also refuses a carriage return in either inline script.
 const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8').replace(/\r\n?/g, '\n');
 const attr = (s) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
-const plain = (html) => html.replace(/<[^>]+>/g, '').replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
+// Tags are stripped until none remain, so "<scr<b>ipt>" cannot reassemble into a tag
+const stripTags = (s) => { for (let prev = null; prev !== s;) { prev = s; s = s.replace(/<[^>]*>/g, ''); } return s.replace(/</g, ''); };
+const plain = (html) => stripTags(html).replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
 
 function version() {
   const m = /^version = "([^"]+)"/m.exec(fs.readFileSync(path.join(REPO, 'pyproject.toml'), 'utf8'));
@@ -143,4 +145,4 @@ if (require.main === module) {
   const r = build();
   console.log('web/dist/index.html (' + r.bytes + ' bytes, opens from disk) and the host files written');
 }
-module.exports = { build, cspFor, faqFrom, THEME_SCRIPT };
+module.exports = { build, cspFor, faqFrom, THEME_SCRIPT, plain };
