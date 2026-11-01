@@ -9,3 +9,6 @@ reports/
 build/
 .coverage
 coverage.xml
+
+# Nightly fix run scratch (see .github/workflows/nightly-fix.yml)
+.nightly/
