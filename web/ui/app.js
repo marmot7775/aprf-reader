@@ -353,6 +353,26 @@
     const bytes = new TextEncoder().encode(text);
     run([{ name: APRF.pastedName(bytes), file: new Blob([bytes]) }], 'paste');
   };
+  // Theme switch, as dns-audit.com's static/theme.js: a click sets
+  // data-theme on <html> and saves it under the localStorage key theme. The
+  // head script applies a saved choice before first paint. When storage is
+  // blocked the choice lasts for the visit.
+  const toggle = $('theme-toggle');
+  if (toggle) {
+    const root = document.documentElement;
+    const light = matchMedia('(prefers-color-scheme: light)');
+    const current = () => root.getAttribute('data-theme') || (light.matches ? 'light' : 'dark');
+    const relabel = () => { const next = current() === 'dark' ? 'light' : 'dark'; toggle.setAttribute('aria-label', 'Switch to ' + next + ' theme'); toggle.title = 'Switch to ' + next + ' theme'; };
+    relabel();
+    toggle.addEventListener('click', () => {
+      const next = current() === 'dark' ? 'light' : 'dark';
+      root.setAttribute('data-theme', next);
+      try { localStorage.setItem('theme', next); } catch (e) { /* storage blocked */ }
+      relabel();
+    });
+    if (light.addEventListener) light.addEventListener('change', () => { if (!root.getAttribute('data-theme')) relabel(); });
+  }
+
   $('paste-read').addEventListener('click', () => { if ($('paste-box').value.trim()) pasted($('paste-box').value); });
   // Ctrl+V or Cmd+V anywhere on the page reads what was copied, text or files
   document.addEventListener('paste', (e) => {

@@ -19,6 +19,12 @@
   --font-xs: 0.75rem; --font-sm: 0.8125rem; --font-base: 0.9375rem; --font-md: 1rem; --font-lg: 1.125rem; --font-xl: 1.25rem; --font-3xl: 1.75rem;
   --radius-sm: 4px; --radius: 8px; --radius-lg: 12px;
   --max-width: 960px;
+  /* dns-audit.com's names for the tokens above, so the shared site chrome
+     rules copy over unchanged. */
+  --text-primary: var(--text); --text-secondary: var(--text-2); --text-muted: var(--muted); --bg-raised: var(--raised);
+  --primary-light: #7ea6f5;
+  --space-xs: 4px; --space-sm: 8px; --space-md: 16px; --space-lg: 24px; --space-xl: 32px;
+  --ease: cubic-bezier(0.25, 0.1, 0.25, 1); --duration: 0.15s;
 }
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) {
@@ -30,6 +36,7 @@
     --pass: #177245; --pass-bg: rgba(23, 114, 69, 0.07); --pass-border: rgba(23, 114, 69, 0.22);
     --caveat: #9a5a10; --caveat-bg: rgba(154, 90, 16, 0.08); --caveat-border: rgba(154, 90, 16, 0.22);
     --gap-fill: rgba(90, 102, 120, 0.08);
+    --primary-light: #2f5fcc;
   }
 }
 :root[data-theme="light"] {
@@ -41,11 +48,15 @@
   --pass: #177245; --pass-bg: rgba(23, 114, 69, 0.07); --pass-border: rgba(23, 114, 69, 0.22);
   --caveat: #9a5a10; --caveat-bg: rgba(154, 90, 16, 0.08); --caveat-border: rgba(154, 90, 16, 0.22);
   --gap-fill: rgba(90, 102, 120, 0.08);
+  --primary-light: #2f5fcc;
 }
 
 * { box-sizing: border-box; }
+/* The site header is sticky, so a results jump lands below it. */
+html { scroll-padding-top: 76px; }
+@media (max-width: 640px) { html { scroll-padding-top: 128px; } }
 body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font-body); font-size: var(--font-base); line-height: 1.6; -webkit-font-smoothing: antialiased; }
-.site-bar-in, main.wrap, .site-foot-in { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+main.wrap, .site-header .header-inner, .site-footer .container { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
 main.wrap { padding-block: 28px 48px; }
 [hidden] { display: none !important; }
 .wrap { max-width: var(--max-width); margin: 0 auto; display: grid; gap: 16px; min-width: 0; }
@@ -54,15 +65,99 @@ main.wrap { padding-block: 28px 48px; }
 .mono, code { font-family: var(--font-mono); font-size: var(--font-sm); }
 a { color: var(--primary); text-underline-offset: 3px; text-decoration-color: var(--primary-border); }
 
-/* Site bar: the same wordmark and links as dns-audit.com */
-.site-bar { border-bottom: 1px solid var(--border); background: var(--raised); }
-.site-bar-in { max-width: var(--max-width); margin: 0 auto; min-height: 56px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 16px; }
-.logo { color: var(--text); text-decoration: none; font-weight: 700; font-size: var(--font-lg); letter-spacing: -0.01em; display: inline-flex; align-items: center; min-height: 44px; }
-.logo .accent { color: var(--primary); }
-.site-bar nav { display: flex; flex-wrap: wrap; gap: 2px; margin-inline: -8px; }
-.site-bar nav a { color: var(--text-2); text-decoration: none; font-size: var(--font-sm); font-weight: 500; padding: 0 8px; min-height: 44px; display: inline-flex; align-items: center; border-radius: var(--radius); }
-.site-bar nav a:hover { color: var(--text); background: var(--surface-hover); }
-.site-bar nav a[aria-current="page"] { color: var(--text); box-shadow: inset 0 -2px 0 var(--primary); border-radius: 0; }
+/* Site chrome: the header and footer rules from dns-audit.com's
+   static/style.css, copied as they are so the three apps match
+   (docs/site-chrome.html in the dns-audit repo). The theme switch sets
+   data-theme on <html> and keeps the choice in localStorage, as
+   dns-audit.com does. */
+.container { width: 100%; max-width: var(--max-width); margin: 0 auto; padding: 0 max(var(--space-lg), env(safe-area-inset-right)) 0 max(var(--space-lg), env(safe-area-inset-left)); }
+.site-header { background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100; padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
+.header-inner { display: flex; align-items: center; justify-content: space-between; height: 60px; }
+.logo { display: flex; align-items: center; text-decoration: none; color: var(--text-primary); transition: opacity var(--duration) var(--ease); }
+.logo:hover { opacity: 0.85; }
+.logo-text { font-weight: 700; font-size: var(--font-lg); letter-spacing: -0.01em; padding-bottom: 0.32em; }
+.logo-accent { color: var(--primary); }
+.header-right { display: flex; align-items: center; gap: 1.5rem; }
+.site-nav { display: flex; align-items: center; gap: 0.25rem; }
+.nav-link { font-size: var(--font-sm); font-weight: 500; color: var(--text-muted); text-decoration: none; padding: 0.3rem 0.55rem; border-radius: var(--radius); transition: color 0.15s var(--ease), background 0.15s var(--ease); }
+.nav-link:hover { color: var(--text-primary); background: var(--surface); }
+.nav-link-active { color: var(--text-primary); font-weight: 500; border-bottom: 2px solid var(--primary); padding-bottom: 2px; }
+.nav-sep { width: 1px; height: 18px; background: var(--border); margin: 0 0.5rem; flex: 0 0 auto; }
+.site-footer { border-top: 1px solid rgba(255, 255, 255, 0.06); padding: var(--space-xl) 0 calc(var(--space-xl) + env(safe-area-inset-bottom)); margin-top: 0; flex-shrink: 0; background: var(--bg-raised); }
+.footer-row { display: flex; justify-content: space-between; align-items: center; gap: 1.5rem; }
+.footer-main { padding-bottom: var(--space-lg); }
+.footer-brand { display: flex; flex-direction: column; gap: 0.3rem; }
+.footer-brand-name { font-size: var(--font-md); font-weight: 500; color: var(--text-primary); letter-spacing: -0.01em; }
+.footer-brand-desc { font-size: var(--font-sm); color: var(--text-secondary); line-height: 1.5; }
+.footer-nav { display: flex; align-items: center; gap: 1.25rem; }
+.footer-link { color: var(--primary-light); text-decoration: none; font-size: var(--font-base); font-weight: 500; transition: color var(--duration) var(--ease); }
+.footer-link:hover { color: var(--primary); text-decoration: underline; }
+.footer-meta { border-top: 1px solid var(--border); padding-top: var(--space-md); font-size: var(--font-xs, 0.75rem); color: var(--text-muted); align-items: baseline; }
+.footer-meta .footer-link { font-size: inherit; color: var(--text-secondary); }
+.footer-attribution .footer-link { white-space: nowrap; }
+.footer-attribution { margin: 0; flex: 1 1 auto; text-align: left; line-height: 1.5; }
+.footer-trust { display: flex; align-items: center; gap: 1rem; flex: 0 0 auto; white-space: nowrap; }
+.footer-version { color: var(--text-muted); font-family: var(--font-mono); }
+@media (max-width: 768px) {
+  .nav-link { font-size: var(--font-xs); padding: 0.25rem 0.45rem; }
+}
+@media (max-width: 640px) {
+  .container { padding: 0 max(var(--space-md), env(safe-area-inset-right)) 0 max(var(--space-md), env(safe-area-inset-left)); }
+  .site-header .header-inner { height: auto; padding-top: 0.65rem; padding-bottom: 0.65rem; flex-wrap: wrap; row-gap: 0.25rem; }
+  .site-nav { gap: 0.1rem; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; flex-wrap: nowrap; }
+  .site-nav::-webkit-scrollbar { display: none; }
+  .footer-row { flex-direction: column; align-items: center; text-align: center; gap: 1rem; }
+  .footer-brand { align-items: center; }
+  .footer-nav, .footer-trust { flex-wrap: wrap; justify-content: center; white-space: normal; }
+  .footer-attribution { text-align: center; }
+}
+@media (max-width: 320px) {
+  .container { padding: 0 0.75rem; }
+}
+@media (max-height: 500px) and (orientation: landscape) {
+  .site-header .header-inner { height: 48px; }
+}
+@media print {
+  .site-header, .site-footer { display: none !important; }
+}
+@media (prefers-color-scheme: light) {
+  :where(html:not([data-theme="dark"])) .site-header { background: rgba(248, 250, 252, 0.9); }
+  :where(html:not([data-theme="dark"])) .site-footer { background: var(--surface-hover); border-top-color: var(--border); }
+}
+:where(html[data-theme="light"]) .site-header { background: rgba(248, 250, 252, 0.9); }
+:where(html[data-theme="light"]) .site-footer { background: var(--surface-hover); border-top-color: var(--border); }
+.theme-toggle { background: none; border: none; border-radius: var(--radius); padding: 0.25rem; cursor: pointer; color: var(--text-secondary); display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; transition: color 0.15s, background 0.15s; margin-left: 0.35rem; flex: 0 0 auto; }
+.theme-toggle:hover { color: var(--text-primary); background: var(--surface); }
+.theme-toggle svg { width: 18px; height: 18px; }
+.theme-toggle .theme-icon-moon { display: none; }
+@media (prefers-color-scheme: light) {
+  :where(html:not([data-theme="dark"])) .theme-toggle .theme-icon-sun { display: none; }
+  :where(html:not([data-theme="dark"])) .theme-toggle .theme-icon-moon { display: block; }
+}
+:where(html[data-theme="light"]) .theme-toggle .theme-icon-sun { display: none; }
+:where(html[data-theme="light"]) .theme-toggle .theme-icon-moon { display: block; }
+@media (max-width: 640px) {
+  .theme-toggle { width: 44px; height: 44px; }
+}
+@media (max-width: 640px) {
+  .logo { min-height: 44px; }
+  .logo-text { font-size: 1rem; white-space: nowrap; }
+  .nav-link { white-space: nowrap; flex-shrink: 0; font-size: var(--font-xs); padding: 0.25rem 0.4rem; min-height: 44px; display: flex; align-items: center; min-width: 44px; justify-content: center; }
+  .footer-nav .footer-link, .footer-trust .footer-link { display: inline-flex; align-items: center; min-height: 44px; padding: 0 0.25rem; }
+  .footer-attribution .footer-link { position: relative; }
+  .footer-attribution .footer-link::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 44px; transform: translateY(-50%); }
+  .site-footer { padding-bottom: calc(var(--space-xl) + 44px); }
+}
+.nav-short { display: none; }
+@media (max-width: 480px) {
+  .nav-long { display: none; }
+  .nav-short { display: inline; }
+}
+@media (max-width: 340px) {
+  .nav-link { padding: 0.25rem 0.2rem; }
+  .nav-sep { margin: 0 0.2rem; }
+}
+
 
 header.top { display: grid; gap: 8px; }
 header.top h1 { font-size: var(--font-3xl); font-weight: 700; letter-spacing: -0.02em; margin: 0; line-height: 1.2; text-wrap: balance; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
@@ -162,11 +257,6 @@ tr:last-child td { border-bottom: 0; }
 .faq p { margin: 0 0 12px; color: var(--text-2); }
 .cli { font-family: var(--font-mono); font-size: var(--font-sm); background: var(--code-bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px; overflow-x: auto; white-space: pre; margin: 0 0 12px; color: var(--text); }
 
-.site-foot { border-top: 1px solid var(--border); background: var(--raised); color: var(--text-2); font-size: var(--font-sm); }
-.site-foot-in { max-width: var(--max-width); margin: 0 auto; padding-block: 24px calc(32px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 10px; }
-.site-foot p { margin: 0; max-width: 76ch; }
-.foot-links { display: flex; flex-wrap: wrap; gap: 4px 16px; }
-
 @media (forced-colors: active) {
   .chart .line { stroke: CanvasText; } .chart .flag { stroke: Highlight; }
 }
@@ -176,17 +266,24 @@ tr:last-child td { border-bottom: 0; }
 }
 </style>
 
-<header class="site-bar">
-  <div class="site-bar-in">
-    <a class="logo" href="https://dns-audit.com/"><span>dns<span class="accent">-audit</span>.com</span></a>
-    <nav aria-label="dns-audit.com">
-      <a href="https://dns-audit.com/">DNS audit</a>
-      <a href="https://headers.dns-audit.com/">Header Decoder</a>
-      <a href="./" aria-current="page">APRF Reader</a>
-      <a href="https://dns-audit.com/articles/">Articles</a>
-      <a href="https://dns-audit.com/about">About</a>
-    </nav>
-  </div>
+<header class="site-header">
+    <div class="container header-inner">
+        <a href="/" class="logo"><span class="logo-text">dns<span class="logo-accent">-audit</span>.com</span></a>
+        <div class="header-right">
+            <nav class="site-nav" aria-label="Main navigation">
+                <a href="https://dns-audit.com/" class="nav-link" aria-label="DNS Audit"><span class="nav-long">DNS Audit</span><span class="nav-short">Audit</span></a>
+                <a href="https://headers.dns-audit.com/" class="nav-link" rel="noopener" aria-label="Header Decoder"><span class="nav-long">Header Decoder</span><span class="nav-short">Headers</span></a>
+                <a href="https://aprf.dns-audit.com/" class="nav-link nav-link-active" aria-current="page" rel="noopener" aria-label="APRF Reader"><span class="nav-long">APRF Reader</span><span class="nav-short">APRF</span></a>
+                <span class="nav-sep" aria-hidden="true"></span>
+                <a href="https://dns-audit.com/articles/" class="nav-link">Articles</a>
+                <a href="https://dns-audit.com/about" class="nav-link">About</a>
+                <button type="button" class="theme-toggle" id="theme-toggle" aria-label="Switch theme" title="Switch theme">
+                    <svg class="theme-icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+                    <svg class="theme-icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+                </button>
+            </nav>
+        </div>
+    </div>
 </header>
 
 <main class="wrap" id="main">
@@ -247,11 +344,28 @@ aprf-reader reports/ --html summary.html</pre><p>The source for both is on <a hr
   </section>
 </main>
 
-<footer class="site-foot">
-  <div class="site-foot-in">
-    <p><span class="beta">Beta</span> Did it read a report wrong? Email <a href="mailto:dns@dns-audit.com">dns@dns-audit.com</a> or open an issue on GitHub.</p>
-    <p>Built by <a href="https://dns-audit.com/about">Neil Anuskiewicz</a>, an email deliverability and DNS consultant.</p>
-    <p class="foot-links"><a href="https://dns-audit.com/">dns-audit.com</a><a href="https://headers.dns-audit.com/">Header Decoder</a><a href="https://dns-audit.com/articles/">Articles</a><a href="https://www.linkedin.com/in/neilanuskiewicz/" rel="noopener">LinkedIn</a><a href="https://github.com/marmot7775/aprf-reader" rel="noopener">Source on GitHub</a></p>
-  </div>
+<footer class="site-footer">
+    <div class="container">
+        <div class="footer-row footer-main">
+            <div class="footer-brand">
+                <div class="footer-brand-name">dns-audit.com</div>
+                <div class="footer-brand-desc">Free, open source DNS and email security auditing</div>
+            </div>
+            <nav class="footer-nav" aria-label="Footer">
+                <a href="https://dns-audit.com/articles/" class="footer-link">Articles</a>
+                <a href="https://dns-audit.com/about" class="footer-link">About</a>
+                <a href="https://dns-audit.com/privacy" class="footer-link">Privacy</a>
+                <a href="https://github.com/marmot7775/aprf-reader" target="_blank" rel="noopener" class="footer-link">GitHub</a>
+            </nav>
+        </div>
+        <div class="footer-row footer-meta">
+            <p class="footer-attribution">Built by Neil Anuskiewicz. <a href="mailto:dns@dns-audit.com" class="footer-link">Email dns@dns-audit.com</a> or <a href="https://www.linkedin.com/in/neilanuskiewicz/" target="_blank" rel="noopener" class="footer-link">message me on LinkedIn</a>.</p>
+            <div class="footer-trust">
+                <span class="footer-version">v2.0.0</span>
+                <a href="https://github.com/marmot7775/aprf-reader/security/policy" target="_blank" rel="noopener" class="footer-link">Security policy</a>
+                <a href="https://github.com/marmot7775/aprf-reader/blob/main/LICENSE" target="_blank" rel="noopener" class="footer-link">MIT License</a>
+            </div>
+        </div>
+    </div>
 </footer>
 <!-- SCRIPTS -->
