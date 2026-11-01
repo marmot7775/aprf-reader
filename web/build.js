@@ -2,8 +2,9 @@
 // build.js: inline src and ui into one self-contained page, as the Email
 // Header Decoder does. dist/index.html opens from disk. Its Content-Security-Policy
 // lets the page connect only to dns-audit.com, for the usage note after each use,
-// and script-src allows only the hash of the one inline script. The rest of dist
-// is what the static host serves beside it.
+// and script-src allows only the hashes of the two inline scripts: the theme
+// script in the head and the page script. The rest of dist is what the static
+// host serves beside it.
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -16,16 +17,22 @@ const SITE = 'https://aprf.dns-audit.com/';
 const USAGE_ORIGIN = 'https://dns-audit.com';
 // Synthetic, never a real report
 const SAMPLE = path.join(REPO, 'tests/fixtures/sample_six_weeks.json');
-const cspFor = (script) => "default-src 'none'; script-src 'sha256-" + crypto.createHash('sha256').update(script, 'utf8').digest('base64') + "'; style-src 'unsafe-inline'; img-src data:; connect-src " + USAGE_ORIGIN + "; form-action 'none'; base-uri 'none'";
+// Runs in the head so a saved theme applies before first paint, as
+// dns-audit.com's static/theme.js does. ui/app.js saves the choice.
+const THEME_SCRIPT = "try{var t=localStorage.getItem('theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}";
+// script-src names the sha256 of each inline script, so no other script runs.
+const sha = (s) => "'sha256-" + crypto.createHash('sha256').update(s, 'utf8').digest('base64') + "'";
+const cspFor = (...scripts) => "default-src 'none'; script-src " + scripts.map(sha).join(' ') + "; style-src 'unsafe-inline'; img-src data:; connect-src " + USAGE_ORIGIN + "; form-action 'none'; base-uri 'none'";
 // Links the page may carry. A link sends nothing until someone follows it.
-const LINKS = /https?:\/\/(?!dns-audit\.com|headers\.dns-audit\.com|www\.linkedin\.com\/in\/neilanuskiewicz|github\.com\/marmot7775|pypi\.org\/project\/aprf-reader|www\.w3\.org\/2000\/svg)/;
+const LINKS = /https?:\/\/(?!(?:headers\.|aprf\.)?dns-audit\.com|www\.linkedin\.com\/in\/neilanuskiewicz|github\.com\/marmot7775|pypi\.org\/project\/aprf-reader|www\.w3\.org\/2000\/svg)/;
 
 const TITLE = 'APRF Report Reader: your inbox placement, from the provider\'s own numbers';
 const DESCRIPTION = 'Free APRF report reader. See whether your mail reaches the inbox, from the mailbox provider\'s own numbers: inbox and unwanted counts day by day, what changed, and a check against the draft standard. Free, no sign-up.';
 const ICON = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="7" fill="#2f5fcc"/><path d="M7 23l6-7 5 4 7-10" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>');
 
 // Line endings are normalized because the browser hashes inline scripts with LF only;
-// a Windows checkout with CRLF would otherwise ship a page whose CSP blocks its own script
+// a Windows checkout with CRLF would otherwise ship a page whose CSP blocks its own script.
+// build() also refuses a carriage return in either inline script.
 const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8').replace(/\r\n?/g, '\n');
 const attr = (s) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 const plain = (html) => html.replace(/<[^>]+>/g, '').replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
@@ -78,6 +85,7 @@ function head(page, csp) {
   return [
     '<meta charset="utf-8">',
     '<meta http-equiv="Content-Security-Policy" content="' + csp + '">',
+    '<script>' + THEME_SCRIPT + '</script>',
     '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">',
     '<title>' + attr(TITLE) + '</title>',
     '<meta name="description" content="' + attr(DESCRIPTION) + '">',
@@ -115,7 +123,8 @@ function build() {
     read('ui/app.js');
   if (js.includes('</script')) throw new Error('script text contains </script');
   const script = '\n' + js + '\n';
-  const csp = cspFor(script);
+  if ([THEME_SCRIPT, script].some((s) => s.includes('\r'))) throw new Error('an inline script contains a carriage return; its hash would not match');
+  const csp = cspFor(THEME_SCRIPT, script);
   const body = page.replace('<!-- SCRIPTS -->', () => '<script>' + script + '</script>')
     .replace(/^<title>[^<]*<\/title>\n/, '');
   const full = '<!doctype html>\n<html lang="en">\n<head>\n' + head(page, csp) + '\n</head>\n<body>\n' + body + '\n</body>\n</html>\n';
@@ -134,4 +143,4 @@ if (require.main === module) {
   const r = build();
   console.log('web/dist/index.html (' + r.bytes + ' bytes, opens from disk) and the host files written');
 }
-module.exports = { build, cspFor, faqFrom };
+module.exports = { build, cspFor, faqFrom, THEME_SCRIPT };
