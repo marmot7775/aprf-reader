@@ -28,7 +28,7 @@ name: Nightly fix
 
 on:
   schedule:
-    - cron: "17 12 * * *" # 11:17 UTC, early morning Pacific
+    - cron: "17 12 * * *" # 12:17 UTC, early morning Pacific
   # A new security finding does not wait for the night: after each CodeQL
   # scan of main, run again looking only at code scanning and Dependabot
   # alerts (NIGHTLY_ONLY_ALERTS below), and stop at once when there are none.
