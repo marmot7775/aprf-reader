@@ -13,7 +13,7 @@ Two ways to use it, with the same results:
   paste your reports on the page.
 - **On the command line:** `pipx install aprf-reader`.
 
-**Status: 0.6, beta.** Reads reports in the format of draft-ietf-mailmaint-aprf-00.
+**Status: 0.6, beta.** Reads reports in the format of draft-ietf-mailmaint-aprf-01.
 
 ## What APRF is
 
@@ -99,7 +99,7 @@ to mark a change in what a category counts.
 
 ## Checking against the draft
 
-Every report is checked against draft-ietf-mailmaint-aprf-00, and every
+Every report is checked against draft-ietf-mailmaint-aprf-01, and every
 message names the section, so a list of them can go straight into a review of
 the draft. On the web page, Copy for a draft review copies them as text.
 
@@ -134,13 +134,12 @@ repeats a report already read, such as the same report as `.json` and as
 
 ## How it decides
 
-- **The same day twice, from the same provider:** it keeps the first copy it
-  reads and skips the other, saying whether the skipped copy had a different
-  `version` or different counts. The draft leaves resends open (a note in
-  section 8.1 asks whether a later report should overwrite or be discarded),
-  and `version` is a free string with no order, so there is no defined way
-  to pick the newer one. Files are read in name order, so the first copy is
-  the first by file name, then by position in the file.
+- **The same day twice, from the same provider:** the later copy replaces the
+  earlier one, as section 8.2 says, with a warning that says whether the
+  replaced copy had a different `version` or different counts. `version`
+  marks a difference, not an order, so later means read later: arrival order
+  for a mailbox or mbox, and for files, name order and then position in the
+  file.
 - **The same day from two providers:** both are kept, as separate streams.
 - **Names:** signing domains and selectors compare without case, and an
   international domain matches its `xn--` form, so `bücher.example` and

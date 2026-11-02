@@ -1,4 +1,4 @@
-"""The APRF report format, per draft-ietf-mailmaint-aprf-00.
+"""The APRF report format, per draft-ietf-mailmaint-aprf-01.
 
 Everything that knows field names lives here, so a new draft revision is an
 edit to this file.
@@ -11,7 +11,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 
-DRAFT = "draft-ietf-mailmaint-aprf-00"
+DRAFT = "draft-ietf-mailmaint-aprf-01"
 
 # Names the draft defines, in display order; providers may add others
 PLACEMENT_NAMES = ("inbox", "unwanted")
@@ -124,7 +124,7 @@ def _segment(item: object, i: int) -> Segment:
     if not isinstance(item, dict):
         raise ReportError(f"body[{i}] is not an object (section 5.2.2)")
     seg = item.get("segment")
-    # Section 5.2.2 shows a string, the samples a list
+    # Section 5.2.2 says a list of strings; a lone string is read as one item, with a warning
     if seg is None:
         path: tuple[str, ...] = ()
     elif isinstance(seg, str):
@@ -182,7 +182,9 @@ def _report(obj: object) -> Report:
         contact_info=_text(h.get("contact_info")),
         extra_info=_text(h.get("extra_info")),
         segments=segments,
-        warnings=_warnings(h, segments),
+        warnings=_warnings(h, segments) + tuple(
+            ("segment is a string; section 5.2.2 says a list of strings. Read as a one-item list", f"body[{i}]")
+            for i, s in enumerate(body) if isinstance(s, dict) and isinstance(s.get("segment"), str)),
     )
 
 
