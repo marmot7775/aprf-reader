@@ -1,9 +1,11 @@
 # aprf-reader
 
-Reads APRF (Aggregate Performance Reporting) reports and tells you where the
-mail you signed landed: how much reached the inbox, how much was treated as
-unwanted, and how recipients reacted, day by day and per DKIM selector. It
-points out the days worth a look, such as a jump in unwanted mail.
+Reads APRF inbox placement reports: inbox versus unwanted, day by day, per DKIM selector.
+
+APRF is Aggregate Performance Reporting. The reader shows how much of the
+mail you signed reached the inbox, how much was treated as unwanted, and how
+recipients reacted. It points out the days worth a look, such as a jump in
+unwanted mail.
 
 Two ways to use it, with the same results:
 
