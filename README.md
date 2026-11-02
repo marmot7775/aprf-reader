@@ -45,11 +45,11 @@ aprf-reader --imap imap.gmail.com --user you@gmail.com --folder APRF
 
 In a terminal you get an overview: for each stream, each count's latest value,
 its daily range, and a trend line with a gap for each day with no report, then
-the changes worth a look. Piped or written to a file with `--md`, the output
-is Markdown with the full daily tables.
+the changes worth a look. Piped, or written to a file with `--md PATH`,
+the output is Markdown with the full daily tables.
 
 Point it at report files (`.json`, `.json.gz`), saved report emails (`.eml`),
-mailbox exports (`.mbox`), `.zip` files of any of those, or folders of them. The easiest way to collect reports
+mailbox exports (`.mbox`), `.zip` files of any of those, or folders of them. `-` reads one pasted report or report email from stdin. The easiest way to collect reports
 is a mail filter that moves them into one folder, then an export of that folder:
 Gmail through [Google Takeout](https://takeout.google.com/) (pick Mail and the
 label), Thunderbird with the ImportExportTools NG add-on, or Apple Mail's
@@ -109,7 +109,7 @@ the draft. On the web page, Copy for a draft review copies them as text.
 |---|---|
 | Not valid JSON, or not UTF-8 (UTF-16 and UTF-32 are refused, as RFC 8259 says) | 5 |
 | JSON nested more than 32 levels deep | 5 |
-| A required header field missing or of the wrong type; times not in epoch seconds; `source` or `version` a list, an object or true | 5.2.1 |
+| No header object; `dkim_domain` or `dkim_selector` missing or empty; `report_start` or `report_end` missing or not epoch seconds; `source` or `version` a list, an object or true | 5.2.1 |
 | Not one UTC day from 00:00:00 to 23:59:59, or ending before it starts | 5.1 |
 | Body not a list of segments; a segment not an object | 5.2.2 |
 | A placement or engagement count that is not a whole number | 6, 7 |
@@ -162,6 +162,8 @@ discussion is the [thread on the -01 I-D Action](https://mailarchive.ietf.org/ar
 - **A count a report does not carry** (classification or engagement left out, or a body with no
   segments) is missing, not zero: the table leaves it blank, a body with no segments gets a
   `no counts` row, and the trend, range and changes skip the day.
+- **A missing `source` or `version`:** the report is still read, with no
+  warning; the provider shows as `unknown`.
 - **Counts:** whole numbers only. `100.0` reads as 100; `"100"` and negative
   numbers are refused.
 
