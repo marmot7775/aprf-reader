@@ -1,0 +1,30 @@
+Content-Type: multipart/report; report-type="aprf"; boundary="===============3012377601312407348=="
+MIME-Version: 1.0
+From: aprf@mbp.example
+To: aprf@example.com
+Subject: APRF: 20261001_!_s1_ExampleMail
+Date: Fri, 02 Oct 2026 00:33:20 GMT
+Message-ID: <domain-bang@mbp.example>
+
+--===============3012377601312407348==
+Content-Type: text/plain; charset="us-ascii"
+MIME-Version: 1.0
+Content-Transfer-Encoding: 7bit
+
+Aggregate performance report attached.
+
+--===============3012377601312407348==
+Content-Type: application/json
+MIME-Version: 1.0
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename="20261001_!_s1_ExampleMail.json"
+
+WwogewogICJoZWFkZXIiOiB7CiAgICJ2ZXJzaW9uIjogIjIwMjZhIiwKICAgInNvdXJjZSI6ICJF
+eGFtcGxlIE1haWwiLAogICAiZGtpbV9kb21haW4iOiAiKi5leGFtcGxlLmNvbSIsCiAgICJka2lt
+X3NlbGVjdG9yIjogInMxIiwKICAgInJlcG9ydF9zdGFydCI6IDE3OTA4MTI4MDAsCiAgICJyZXBv
+cnRfZW5kIjogMTc5MDg5OTE5OSwKICAgInNkaV91c2VkIjogIk4vRiIKICB9LAogICJib2R5Ijog
+WwogICB7CiAgICAiY2xhc3NpZmljYXRpb24iOiB7CiAgICAgImluYm94IjogMjAwMCwKICAgICAi
+dW53YW50ZWQiOiAxMAogICAgfSwKICAgICJlbmdhZ2VtZW50IjogewogICAgICJwb3NpdGl2ZSI6
+IDUsCiAgICAgIm5lZ2F0aXZlIjogMQogICAgfQogICB9CiAgXQogfQpd
+
+--===============3012377601312407348==--

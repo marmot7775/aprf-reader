@@ -124,13 +124,21 @@ the draft. On the web page, Copy for a draft review copies them as text.
 | One attachment holding several reports | 8 |
 | A placement key other than the four section 6 names, or an engagement key other than positive, neutral and negative | 6, 5.2.2 |
 | A name or subject that writes `/` or `*` some other way, as a file name must | 8 is silent |
-| The same day twice from one provider | left open, note in 8.1 |
+| The same day twice from one provider | 8.2 |
 
 Comcast's beta sends `sdi_used` as ` - N/A - Beta - Not in use` and a source
 of `Comcast/Xfinity`, so its reports carry the `sdi_used` warning, and a
 correct file name for them cannot follow section 8 exactly. A file that
 repeats a report already read, such as the same report as `.json` and as
 `.eml`, is counted once and summed up in one line.
+
+What a rolled-up report writes for the selector (header `*`) or the domain
+(header `*.example.org`) in its name and subject is unsettled in -01. `!` and
+an empty field (two underscores in a row) have been proposed, so the reader
+accepts those and `*` there without a warning. Reports still match each other
+by their header fields, never by the name, so two spellings of the same report
+are treated as the same day. This gets revisited when -02 lands; the
+discussion is the [thread on the -01 I-D Action](https://mailarchive.ietf.org/arch/msg/mailmaint/qA9kIVnK5-9w1uvL48x6wleAUMk/).
 
 ## How it decides
 

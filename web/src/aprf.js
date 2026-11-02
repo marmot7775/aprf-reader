@@ -411,7 +411,18 @@
     return new RegExp('^' + pattern + '$', 'su').test(fold(actual));
   }
   // Section 8: the ending date, then domain, selector and source with spaces removed
-  const reportName = (r) => r.day.replace(/-/g, '') + '_' + r.dkim_domain + '_' + r.dkim_selector + '_' + r.source.replace(/ /g, '');
+  // What stands in for a rolled-up selector (header "*") or domain (header "*.example.org") in
+  // the name and subject is unsettled in -01: "!" and an empty field have been proposed on the
+  // list. Accept those and "*" until -02 decides; revisit then. Thread on the -01 I-D Action:
+  // https://mailarchive.ietf.org/arch/msg/mailmaint/qA9kIVnK5-9w1uvL48x6wleAUMk/
+  const ROLLUP_STANDINS = ['!', '', '*'];
+  // Section 8 bases for a report, the header's own spelling first
+  function reportNames(r) {
+    const sels = [r.dkim_selector].concat(r.dkim_selector === '*' ? ROLLUP_STANDINS : []);
+    const doms = [r.dkim_domain].concat(r.dkim_domain.startsWith('*.') ? ROLLUP_STANDINS : []);
+    const src = r.source.replace(/ /g, '');
+    return [...new Set(doms.flatMap((d) => sels.map((s) => r.day.replace(/-/g, '') + '_' + d + '_' + s + '_' + src)))];
+  }
 
   function mailWarnings(mail, items) {
     const out = [];
@@ -420,12 +431,14 @@
     if (mail.ctype !== want) out.push(['attachment Content-Type is not application/json, or application/gzip when compressed (sections 8 and 8.1)', mail.ctype]);
     if (items.length > 1) out.push(['one attachment holds several reports; the section 8 name and subject fit one', items.length + ' reports']);
     else if (!(items[0] instanceof ReportError)) {
-      const base = reportName(items[0]);
-      const file = base + (mail.gz ? '.json.gz' : '.json');
-      if (fold(mail.name) === fold(file)) { /* matches */ } else if (loose(file, mail.name)) out.push([NAME_UNSAFE, mail.name + '; section 8 gives ' + file]);
+      const bases = reportNames(items[0]);
+      const base = bases[0];
+      const ext = mail.gz ? '.json.gz' : '.json';
+      const file = base + ext;
+      if (bases.some((b) => fold(mail.name) === fold(b + ext))) { /* matches */ } else if (bases.some((b) => loose(b + ext, mail.name))) out.push([NAME_UNSAFE, mail.name + '; section 8 gives ' + file]);
       else out.push(['attachment name does not follow section 8: <yyyymmdd>_<DKIM domain>_<DKIM selector>_<source>.json', (mail.name || '(none)') + '; expected ' + file]);
       const subj = 'APRF: ' + base;
-      if (fold(mail.subject) === fold(subj)) { /* matches */ } else if (loose(subj, mail.subject)) out.push([SUBJECT_UNSAFE, mail.subject + '; section 8 gives ' + subj]);
+      if (bases.some((b) => fold(mail.subject) === fold('APRF: ' + b))) { /* matches */ } else if (bases.some((b) => loose('APRF: ' + b, mail.subject))) out.push([SUBJECT_UNSAFE, mail.subject + '; section 8 gives ' + subj]);
       else out.push(['subject does not follow section 8: APRF: <yyyymmdd>_<DKIM domain>_<DKIM selector>_<source>', (mail.subject || '(none)') + '; expected ' + subj]);
     }
     return out;

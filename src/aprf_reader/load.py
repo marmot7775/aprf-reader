@@ -173,9 +173,20 @@ def _differs(kept: Report, dropped: Report) -> str:
     return ", with different counts" if kept.segments != dropped.segments else ", same counts"
 
 
-def _name(r: Report) -> str:
-    # Section 8: the ending date, then domain, selector and source with spaces removed
-    return f"{r.day:%Y%m%d}_{r.dkim_domain}_{r.dkim_selector}_{r.source.replace(' ', '')}"
+# What stands in for a rolled-up selector (header "*") or domain (header "*.example.org") in
+# the name and subject is unsettled in -01: "!" and an empty field have been proposed on the
+# list. Accept those and "*" until -02 decides; revisit then. Thread on the -01 I-D Action:
+# https://mailarchive.ietf.org/arch/msg/mailmaint/qA9kIVnK5-9w1uvL48x6wleAUMk/
+ROLLUP_STANDINS = ("!", "", "*")
+
+
+def _names(r: Report) -> list[str]:
+    """Section 8 bases for a report, the header's own spelling first: the ending date,
+    then domain, selector and source with spaces removed."""
+    sels = [r.dkim_selector] + (list(ROLLUP_STANDINS) if r.dkim_selector == "*" else [])
+    doms = [r.dkim_domain] + (list(ROLLUP_STANDINS) if r.dkim_domain.startswith("*.") else [])
+    src = r.source.replace(" ", "")
+    return list(dict.fromkeys(f"{r.day:%Y%m%d}_{d}_{s}_{src}" for d in doms for s in sels))
 
 
 # Characters a file name cannot hold on common systems; "Comcast/Xfinity" and a "*" roll-up
@@ -204,18 +215,19 @@ def _mail_warnings(mail: Mail, items: list) -> list[tuple[str, str]]:
     if len(items) > 1:
         out.append(("one attachment holds several reports; the section 8 name and subject fit one", f"{len(items)} reports"))
     elif isinstance(items[0], Report):
-        base = _name(items[0])
-        file = base + (".json.gz" if mail.gz else ".json")
-        if mail.name.lower() == file.lower():
+        bases = _names(items[0])
+        base, ext = bases[0], (".json.gz" if mail.gz else ".json")
+        file = base + ext
+        if any(mail.name.lower() == (b + ext).lower() for b in bases):
             pass
-        elif _loose(file, mail.name):
+        elif any(_loose(b + ext, mail.name) for b in bases):
             out.append((NAME_UNSAFE, f"{mail.name}; section 8 gives {file}"))
         else:
             out.append(("attachment name does not follow section 8: <yyyymmdd>_<DKIM domain>_<DKIM selector>_<source>.json",
                         f"{mail.name or '(none)'}; expected {file}"))
-        if mail.subject.lower() == f"APRF: {base}".lower():
+        if any(mail.subject.lower() == f"APRF: {b}".lower() for b in bases):
             pass
-        elif _loose(f"APRF: {base}", mail.subject):
+        elif any(_loose(f"APRF: {b}", mail.subject) for b in bases):
             out.append((SUBJECT_UNSAFE, f"{mail.subject}; section 8 gives APRF: {base}"))
         else:
             out.append(("subject does not follow section 8: APRF: <yyyymmdd>_<DKIM domain>_<DKIM selector>_<source>",
