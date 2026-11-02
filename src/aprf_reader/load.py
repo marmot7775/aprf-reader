@@ -44,8 +44,8 @@ class Mail:
     subject: str
     msg_ctype: str  # Content-Type of the message that carries it
 
-DUPLICATE_DAY = ("the same day came twice from one provider; the first copy read was kept. "
-                 "The draft leaves this open (a note in section 8.1)")
+DUPLICATE_DAY = ("the same day came twice from one provider; the later copy replaced the earlier one, "
+                 "as section 8.2 says. Later means read later: arrival order in a mailbox, name order for files")
 
 
 def _files(paths: Iterable[Path]) -> Iterator[Path]:
@@ -271,14 +271,15 @@ def load(paths: Iterable[Path], pasted: bytes | None = None,
                 out.skipped.append((label, str(r)))
                 continue
             out.warnings += [(w, d, label) for w, d in r.warnings]
-            # The draft leaves open whether a resend replaces the first (an open note in
-            # section 8.1), and its version is a free string with no order; keep the first
+            # Section 8.2: a later report for the same name and day overwrites the earlier.
+            # version marks a difference, not an order, so read order decides.
             if r.key in seen_keys:
                 first_label, first = seen_keys[r.key]
-                out.warnings.append((DUPLICATE_DAY, f"{first_label} kept{_differs(first, r)}", label))
-                continue
+                out.warnings.append((DUPLICATE_DAY, f"{first_label} replaced{_differs(r, first)}", label))
+                out.reports[out.reports.index(first)] = r
+            else:
+                out.reports.append(r)
             seen_keys[r.key] = (label, r)
-            out.reports.append(r)
 
     for path in _files(paths):
         try:

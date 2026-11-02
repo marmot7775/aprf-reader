@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aprf-reader"
-version = "0.6.2"
+version = "0.6.3"
 description = "Reads APRF inbox placement reports: inbox versus unwanted, day by day, per DKIM selector."
 readme = "README.md"
 license = { text = "MIT" }

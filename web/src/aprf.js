@@ -4,7 +4,7 @@
 // JSON and Markdown, so the page and the command line cannot drift apart.
 'use strict';
 (function (root) {
-  const DRAFT = 'draft-ietf-mailmaint-aprf-00';
+  const DRAFT = 'draft-ietf-mailmaint-aprf-01';
   const PLACEMENT_NAMES = ['inbox', 'unwanted'];
   const ENGAGEMENT_NAMES = ['positive', 'neutral', 'negative'];
   // sdi_used values that mean no SDI was applied (section 5.2.1), compared on
@@ -62,7 +62,7 @@
     if (!item || typeof item !== 'object' || Array.isArray(item)) throw new ReportError('body[' + i + '] is not an object (section 5.2.2)');
     const seg = item.segment;
     let path;
-    // Section 5.2.2 shows a string, the samples a list
+    // Section 5.2.2 says a list of strings; a lone string is read as one item, with a warning
     if (seg === null || seg === undefined) path = [];
     else if (typeof seg === 'string') path = [seg];
     else if (Array.isArray(seg) && seg.every((s) => typeof s === 'string')) path = seg.slice();
@@ -106,7 +106,8 @@
       contact_info: text(h.contact_info),
       extra_info: text(h.extra_info),
       segments,
-      warnings: reportWarnings(h, segments),
+      warnings: reportWarnings(h, segments).concat(body.flatMap((s, i) => (s && typeof s === 'object' && typeof s.segment === 'string'
+        ? [['segment is a string; section 5.2.2 says a list of strings. Read as a one-item list', 'body[' + i + ']']] : []))),
       // Section 8: the report's date is its ending date, in UTC
       day,
     };
@@ -394,8 +395,8 @@
     return canon(kept.segments) !== canon(dropped.segments) ? ', with different counts' : ', same counts';
   }
 
-  const DUPLICATE_DAY = 'the same day came twice from one provider; the first copy read was kept. ' +
-    'The draft leaves this open (a note in section 8.1)';
+  const DUPLICATE_DAY = 'the same day came twice from one provider; the later copy replaced the earlier one, ' +
+    'as section 8.2 says. Later means read later: arrival order in a mailbox, name order for files';
   // Characters a file name cannot hold on common systems; "Comcast/Xfinity" and a "*" roll-up
   // selector both carry one, and section 8 only says to remove spaces
   const UNSAFE = '/\\:*?"<>|';
@@ -459,16 +460,15 @@
         const label = items.length > 1 ? where + ' report ' + (i + 1) : where;
         if (r instanceof ReportError) { out.skipped.push([label, r.message]); return; }
         for (const [w, d] of r.warnings) out.warnings.push([w, d, label]);
-        // The draft leaves open whether a resend replaces the first (an open note in
-        // section 8.1), and its version is a free string with no order; keep the first
+        // Section 8.2: a later report for the same name and day overwrites the earlier.
+        // version marks a difference, not an order, so read order decides.
         const k = keyOf(r);
         if (seenKeys.has(k)) {
           const [firstLabel, first] = seenKeys.get(k);
-          out.warnings.push([DUPLICATE_DAY, firstLabel + ' kept' + differs(first, r), label]);
-          return;
-        }
+          out.warnings.push([DUPLICATE_DAY, firstLabel + ' replaced' + differs(r, first), label]);
+          out.reports[out.reports.indexOf(first)] = r;
+        } else out.reports.push(r);
         seenKeys.set(k, [label, r]);
-        out.reports.push(r);
       });
     }
 

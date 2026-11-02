@@ -56,6 +56,7 @@ def test_bare_object_and_string_segment():
     obj["body"][0]["segment"] = "CustomerA"
     (r,) = parse(json.dumps(obj).encode())
     assert r.segments[0].path == ("CustomerA",)
+    assert r.warnings[-1] == ("segment is a string; section 5.2.2 says a list of strings. Read as a one-item list", "body[0]")
 
 
 @pytest.mark.parametrize("mutate, reason", [
@@ -245,11 +246,14 @@ def test_stress_set_one_bad_report_does_not_cost_the_file():
     reasons = {w.rsplit(" ", 1)[-1]: r for w, r in loaded.skipped}
     # s18 spans two days and s19 is shifted an hour: draft section 5.1 requires one UTC day
     assert "section 5.1" in reasons["77"] and "section 5.1" in reasons["78"]
-    # Same day from the same provider: keep the first, warn, and say how the copy differs
+    # Same day from the same provider: the later copy wins (section 8.2), with a warning
+    # that says how the copies differ
     dup = {where.rsplit(" ", 1)[-1]: d for w, d, where in loaded.warnings if w.startswith("the same day came twice")}
-    assert dup["64"] == f"{FIX}/stress_100.json report 63 kept, version 1 kept, version 2 dropped"
-    assert dup["69"].endswith("report 68 kept, with different counts")  # bücher.example
-    assert "report 3 kept" in dup["70"]  # SENDER.EXAMPLE / SELECTOR1 is sender.example / selector1
+    assert dup["64"] == f"{FIX}/stress_100.json report 63 replaced, version 2 kept, version 1 dropped"
+    assert dup["69"].endswith("report 68 replaced, with different counts")  # bücher.example
+    assert "report 3 replaced" in dup["70"]  # SENDER.EXAMPLE / SELECTOR1 is sender.example / selector1
+    kept = {(r.source, r.dkim_domain.lower(), r.dkim_selector.lower(), r.day): r.version for r in loaded.reports}
+    assert "2" in kept.values()
     assert not {"64", "69", "70"} & set(reasons)
     warned = {w for w, _, _ in loaded.warnings}
     assert "sdi_used is not N/A, N/F, or the sdi value as published in DNS (section 5.2.1)" in warned
