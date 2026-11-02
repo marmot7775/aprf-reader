@@ -140,8 +140,33 @@ def _segment(item: object, i: int) -> Segment:
     )
 
 
-def _text(value: object) -> str:
-    return "" if value is None else str(value)
+def _text(value: object) -> str | None:
+    """Header text as both readers write it: a string as is, a whole number without a
+    point (1.0 is "1"), another plain number as Python and JavaScript both print it.
+    None for anything else (a list, an object, true), and for a number the two would print
+    differently."""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, bool) or not isinstance(value, int | float):
+        return None
+    if isinstance(value, float):
+        if value.is_integer():
+            value = int(value)
+        elif 1e-4 <= abs(value) < 1e15:
+            return repr(value)
+        else:
+            return None
+    return str(value) if abs(value) <= MAX_COUNT else None
+
+
+def _header_text(h: dict, name: str) -> str:
+    """A header text field: "" when absent or null, an error when present as a list, object or true."""
+    if h.get(name) is None:
+        return ""
+    t = _text(h[name])
+    if t is None:
+        raise ReportError(f"header.{name} is not text or a number (section 5.2.1)")
+    return t
 
 
 def _report(obj: object) -> Report:
@@ -170,17 +195,18 @@ def _report(obj: object) -> Report:
     if not isinstance(body, list):
         raise ReportError("body is not a list of segments (section 5.2.2)")
     segments = tuple(_segment(s, i) for i, s in enumerate(body))
+    source, version = _header_text(h, "source"), _header_text(h, "version")
     return Report(
-        source=_text(h.get("source")) or "unknown",
+        source=source or "unknown",
         dkim_domain=h["dkim_domain"],
         dkim_selector=h["dkim_selector"],
         report_start=start,
         report_end=end,
-        version=_text(h.get("version")),
+        version=version,
         # Comcast's beta sends " - N/A - Beta - Not in use"
-        sdi_used=_text(h.get("sdi_used")).strip(" -"),
-        contact_info=_text(h.get("contact_info")),
-        extra_info=_text(h.get("extra_info")),
+        sdi_used=(_text(h.get("sdi_used")) or "").strip(" -"),
+        contact_info=_text(h.get("contact_info")) or "",
+        extra_info=_text(h.get("extra_info")) or "",
         segments=segments,
         warnings=_warnings(h, segments) + tuple(
             ("segment is a string; section 5.2.2 says a list of strings. Read as a one-item list", f"body[{i}]")
@@ -197,6 +223,9 @@ def _warnings(h: dict, segments: tuple[Segment, ...]) -> tuple[tuple[str, str], 
         if not (raw in ("N/A", "N/F") or (isinstance(raw, str) and SDI_FORMAT.fullmatch(raw))):
             out.append(("sdi_used is not N/A, N/F, or the sdi value as published in DNS (section 5.2.1)",
                         json.dumps(raw, ensure_ascii=False, separators=(',', ':'))))
+    for name in ("contact_info", "extra_info"):
+        if h.get(name) is not None and _text(h[name]) is None:
+            out.append((f"header.{name} is not text or a number (section 5.2.1); ignored", ""))
     keys = lambda attr: sorted({k for s in segments for k in getattr(s, attr)})
     for k in keys("classification"):
         if k not in NAMED_CLASSIFICATION:
@@ -209,6 +238,23 @@ def _warnings(h: dict, segments: tuple[Segment, ...]) -> tuple[tuple[str, str], 
     return tuple(out)
 
 
+# A report nests about four levels deep. Deeper than this is refused in both readers, so a
+# hostile value cannot exhaust either one's stack, and the rest of the file is still read.
+MAX_DEPTH = 32
+TOO_DEEP = "JSON nested too deeply"
+
+
+def _too_deep(doc: object) -> bool:
+    stack = [(doc, 1)]
+    while stack:
+        v, depth = stack.pop()
+        if isinstance(v, dict | list):
+            if depth > MAX_DEPTH:
+                return True
+            stack += [(c, depth + 1) for c in (v.values() if isinstance(v, dict) else v)]
+    return False
+
+
 def _no_constant(name: str) -> None:
     # Python's json takes NaN and Infinity; RFC 8259 and browsers do not
     raise json.JSONDecodeError(f"{name} is not valid JSON", name, 0)
@@ -218,20 +264,27 @@ def parse_items(data: bytes) -> list[Report | ReportError]:
     """Each report in a document, or the reason it cannot be read, so one bad
     report does not cost the rest of the file."""
     try:
-        doc = json.loads(data, parse_constant=_no_constant)
+        # RFC 8259 section 8.1: UTF-8 only. json.loads on bytes would also take UTF-16 and UTF-32,
+        # which the web page refuses; a leading byte order mark is allowed, as the browser allows it
+        doc = json.loads(data.decode("utf-8-sig"), parse_constant=_no_constant)
     except (UnicodeDecodeError, json.JSONDecodeError) as e:
         raise ReportError(f"not valid JSON, which section 5 requires: {e}") from None
     except RecursionError:
-        raise ReportError("JSON nested too deeply") from None
+        raise ReportError(TOO_DEEP) from None
     items = doc if isinstance(doc, list) else [doc]
     if not items:
         raise ReportError("empty list")
     out: list[Report | ReportError] = []
     for o in items:
+        if _too_deep(o):
+            out.append(ReportError(TOO_DEEP))
+            continue
         try:
             out.append(_report(o))
         except ReportError as e:
             out.append(e)
+        except RecursionError:
+            out.append(ReportError(TOO_DEEP))
     return out
 
 

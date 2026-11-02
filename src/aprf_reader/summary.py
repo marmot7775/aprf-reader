@@ -13,6 +13,8 @@ from .report import ENGAGEMENT_NAMES, PLACEMENT_NAMES, Report, uses_sdi
 # Counts where a jump up is bad news, or a drop is
 CHANGES = {"unwanted": "rise", "negative": "rise", "inbox": "fall"}
 MIN_MOVE = 200
+# The row for a report day whose body has no segments
+NO_COUNTS_ROW = "no counts"
 
 
 @dataclass(frozen=True)
@@ -62,17 +64,29 @@ class Stream:
         for d in sorted(self.by_day):
             if prev is not None and (d - prev).days > 1:
                 out.append(Row(prev + timedelta(1), d - timedelta(1), None))
-            for s in self.by_day[d].segments:
+            segments = self.by_day[d].segments
+            if not segments:
+                # A report with no segments is a day the provider reported, with nothing to count
+                out.append(Row(d, d, NO_COUNTS_ROW, (None,) * len(self.columns)))
+            for s in segments:
                 vals = tuple(getattr(s, a).get(k) for a, k in self.columns)
                 out.append(Row(d, d, " / ".join(p or "(blank)" for p in s.path) or "all mail", vals))
             prev = d
         return out
 
-    def trend(self, col: int) -> list[tuple[int, int]]:
-        """(day offset from first, sum across segments) for each report day."""
+    def _series(self, col: int) -> list[tuple[int, int | None]]:
+        """(day offset from first, sum across segments) for each report day; None for a
+        day whose segments do not carry this count, which is missing, not zero."""
         a, k = self.columns[col]
-        return [((d - self.first).days, sum(getattr(s, a).get(k, 0) for s in r.segments))
-                for d, r in sorted(self.by_day.items())]
+        out = []
+        for d, r in sorted(self.by_day.items()):
+            have = [getattr(s, a)[k] for s in r.segments if k in getattr(s, a)]
+            out.append(((d - self.first).days, sum(have) if have else None))
+        return out
+
+    def trend(self, col: int) -> list[tuple[int, int]]:
+        """The series without its missing days. A skipped day leaves a gap in the line."""
+        return [(x, v) for x, v in self._series(col) if v is not None]
 
     @cached_property
     def changes(self) -> list[str]:
@@ -82,8 +96,11 @@ class Stream:
             rule = CHANGES.get(k)
             if rule is None:
                 continue
-            pts = self.trend(col)
+            pts = self._series(col)
             for (x0, old), (x1, new) in zip(pts, pts[1:]):
+                # Nothing is computed across a day that does not carry the count
+                if old is None or new is None:
+                    continue
                 # Comcast's buckets are 100 wide, so a move under two buckets is noise
                 if rule == "rise" and new >= 2 * old and new - old >= MIN_MOVE:
                     verb = "rose"

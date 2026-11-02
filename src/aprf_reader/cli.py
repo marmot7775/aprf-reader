@@ -15,7 +15,7 @@ from pathlib import Path
 from . import __version__
 from .imap import ImapError, fetch
 from .load import load
-from .render import to_html, to_markdown, to_terminal
+from .render import clean, to_html, to_markdown, to_terminal
 from .summary import to_dict
 
 
@@ -64,12 +64,12 @@ def main(argv: list[str] | None = None) -> int:
             messages = list(fetch(host, args.user, password, args.folder, int(port or 993), args.since, args.all_mail))
         # imaplib.IMAP4.error and UnicodeError are a backstop; fetch() turns what it can into ImapError
         except (ImapError, imaplib.IMAP4.error, OSError, UnicodeError) as e:
-            print(f"aprf-reader: {args.imap}: {e}", file=sys.stderr)
+            print(f"aprf-reader: {args.imap}: {clean(str(e))}", file=sys.stderr)
             return 2
         print(f"read {len(messages)} message{'s' if len(messages) != 1 else ''} from {args.folder} on {host}", file=sys.stderr)
     loaded = load(paths, pasted, messages, f"imap://{args.imap}/{args.folder}" if args.imap else "mailbox")
     for where, reason in loaded.skipped:
-        print(f"skipped {where}: {reason}", file=sys.stderr)
+        print(f"skipped {clean(where)}: {clean(reason)}", file=sys.stderr)
     if not loaded.reports:
         print("no APRF reports found", file=sys.stderr)
         return 1

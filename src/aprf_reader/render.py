@@ -31,8 +31,22 @@ def _n(v: int | None) -> str:
     return "" if v is None else f"{v:,}"
 
 
+# CommonMark section 2.1 ends a line at LF, CR or CRLF; U+2028 and U+2029 are line breaks to
+# other readers. Each becomes one space, so provider text cannot split a table row.
+_LINE_BREAKS = re.compile(r"\r\n|[\r\n\u2028\u2029]")
+
+
 def _md(text: str) -> str:
-    return text.replace("\\", "\\\\").replace("|", "\\|").replace("\n", " ")
+    return _LINE_BREAKS.sub(" ", text.replace("\\", "\\\\").replace("|", "\\|"))
+
+
+_CONTROL = re.compile(r"[\x00-\x1f\x7f-\x9f]")
+
+
+def clean(text: str) -> str:
+    """Provider text for a terminal: C0 and C1 control characters and DEL written as \\xNN, so a
+    report cannot move the cursor, erase a line or set a title."""
+    return _CONTROL.sub(lambda m: f"\\x{ord(m[0]):02x}", text)
 
 
 def _plural(n: int, word: str) -> str:
@@ -152,7 +166,7 @@ def to_html(loaded: Loaded) -> str:
         parts.append("<h2>Skipped</h2><ul>" + "".join(f"<li>{e(w)}: {e(r)}" for w, r in loaded.skipped) + "</ul>")
     if loaded.copies:
         parts.append(f"<p class=muted>{e(copies_line(loaded.copies))}</p>")
-    parts.append(f"<p class=muted>Read by aprf-reader {e(__version__)} against {DRAFT}. Nothing left this computer.</p>")
+    parts.append(f"<p class=muted>Read by aprf-reader {e(__version__)} against {DRAFT}.</p>")
     parts.append("</body></html>")
     return "\n".join(parts) + "\n"
 
@@ -219,13 +233,13 @@ def to_terminal(loaded: Loaded, color: bool = True, width: int = 100) -> str:
     out = [st.bold("APRF placement summary") + st.dim(f"  {_counts(loaded, ss)}"), ""]
     out += [st.dim(line) for line in _wrap(CAVEAT, min(width, 100))] + [""]
     for s in ss:
-        out.append(st.accent(s.domain) + "  " + st.bold(f"selector {s.selector}"))
-        meta = [s.source, _range(s.first, s.last), _plural(len(s.by_day), "report")]
+        out.append(st.accent(clean(s.domain)) + "  " + st.bold(f"selector {clean(s.selector)}"))
+        meta = [clean(s.source), _range(s.first, s.last), _plural(len(s.by_day), "report")]
         line = st.dim(" · ".join(meta))
         if s.missing:
             line += st.dim(" · ") + st.warn(f"{_plural(s.missing, 'day')} with no report")
         out += [line, ""]
-        names = [k for _, k in s.columns]
+        names = [clean(k) for _, k in s.columns]
         if not names:
             out += ["  " + st.dim(NO_COUNTS), ""]
             continue
@@ -241,25 +255,25 @@ def to_terminal(loaded: Loaded, color: bool = True, width: int = 100) -> str:
         out.append("")
         if s.changes:
             out.append(st.bold("  Changes worth a look"))
-            out += [f"  {st.warn('!')} " + re.sub(r"(\d{4})-(\d\d)-(\d\d)", lambda m: _date(date.fromisoformat(m[0])), c)
+            out += [f"  {st.warn('!')} " + re.sub(r"(\d{4})-(\d\d)-(\d\d)", lambda m: _date(date.fromisoformat(m[0])), clean(c))
                     for c in s.changes]
         else:
             out.append(f"  {st.good('✓')} " + st.dim("No big day-to-day moves in inbox, unwanted, or negative counts."))
         for n in s.notes:
-            out += _wrap(n, width - 4, "  · ")
+            out += _wrap(clean(n), width - 4, "  · ")
         out.append("")
     if loaded.warnings:
         out.append(st.warn(f"Warnings {len(grouped(loaded.warnings))}"))
         out += [st.dim(line) for line in _wrap(WARNINGS_NOTE, width - 2, "  ")]
         for g in grouped(loaded.warnings):
-            out += _wrap(_warning(*g), width - 2, "  ")
+            out += _wrap(clean(_warning(*g)), width - 2, "  ")
         out.append("")
     if loaded.copies:
         out += [st.dim(line) for line in _wrap(copies_line(loaded.copies), width)] + [""]
     if loaded.skipped:
         out.append(st.warn(f"Skipped {len(loaded.skipped)}"))
         for w, r in loaded.skipped:
-            out += [st.dim(line) for line in _wrap(f"{w}: {r}", width - 2, "  ")]
+            out += [st.dim(line) for line in _wrap(clean(f"{w}: {r}"), width - 2, "  ")]
         out.append("")
     out.append(st.dim(f"aprf-reader {__version__}, {DRAFT}. Daily tables: --markdown, or --html for a page."))
     return "\n".join(out) + "\n"
