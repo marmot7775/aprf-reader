@@ -863,7 +863,27 @@ tr.gap td{background:var(--gap);color:var(--muted)}tr.trend td{border-bottom:2px
     return parts.join('\n') + '\n';
   }
 
-  const APRF = { sortFiles, pastedName, DRAFT, CAVEAT, NO_COUNTS, WARNINGS_NOTE, grouped, warningText, copiesLine, ReportError, parse, load, wanted, streams, toDict, toMarkdown, toHtml, span, rowDay, plural, fmt, addDays, dayOffset: between };
+  // A skip reason as a stable code, for the usage note. The reason strings are
+  // written for a person reading the page; these codes are written to be counted.
+  // A code never carries the filename or the exception text, so a note can say
+  // what kind of file was refused without saying anything about whose it was.
+  const SKIP_CODES = [
+    [/inside a zip is not read/, 'nested_archive'],
+    [/^encrypted in the zip$/, 'encrypted'],
+    [/^larger than /, 'too_large'],
+    [/could not be unpacked/, 'unpack_failed'],
+    [/with no report attached$/, 'no_report_attached'],
+    [/report files in one zip$/, 'zip_too_many'],
+  ];
+  // Anything unmatched is 'unreadable': a parse failure, which is the one skip
+  // reason that may mean the reader has a bug rather than the file being wrong.
+  function skipCode(reason) {
+    const text = typeof reason === 'string' ? reason : '';
+    for (const [re, code] of SKIP_CODES) if (re.test(text)) return code;
+    return 'unreadable';
+  }
+
+  const APRF = { sortFiles, pastedName, DRAFT, CAVEAT, NO_COUNTS, WARNINGS_NOTE, grouped, warningText, copiesLine, ReportError, parse, load, wanted, streams, toDict, toMarkdown, toHtml, span, rowDay, plural, fmt, addDays, dayOffset: between, skipCode };
   root.APRF = APRF;
   if (typeof module !== 'undefined' && module.exports) module.exports = APRF;
 })(typeof window !== 'undefined' ? window : globalThis);

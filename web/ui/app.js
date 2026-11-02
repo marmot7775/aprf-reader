@@ -61,27 +61,42 @@
       const loaded = await APRF.load(await readAll(entries));
       if (!loaded.reports.length) {
         status('No APRF reports found in ' + APRF.plural(entries.length, 'file') + '. ' + (loaded.skipped[0] ? 'First problem: ' + loaded.skipped[0][1] + '.' : ''), true);
+        note(loaded, label === 'sample', 'none');
         return;
       }
       status('');
       current = { loaded, sample: label === 'sample' };
       render();
-      note(loaded, label === 'sample');
+      note(loaded, label === 'sample', loaded.skipped.length ? 'partial' : 'ok');
     } catch (e) {
       status('Something went wrong reading those files: ' + e.message, true);
+      note(null, label === 'sample', 'error');
     }
   }
 
   // One usage note per run to dns-audit.com, so its owner can see the page is used.
   // Counts only: never report contents, domains or addresses (CLAUDE.md).
   // text/plain needs no CORS preflight; the reply is not read, and a failure is ignored.
-  function note(loaded, sample) {
-    const ss = APRF.streams(loaded.reports);
+  // outcome is 'ok', 'partial' (read, but something was skipped), 'none' (files
+  // held no report) or 'error' (the read threw). A note is sent for all four, so
+  // a failure is as visible in the log as a success; loaded is null for 'error'.
+  function note(loaded, sample, outcome) {
+    const ss = loaded ? APRF.streams(loaded.reports) : [];
     // Where the visitor came from, host only; a link within the site is not a source
     let ref;
     try { const h = new URL(document.referrer).hostname; if (h && h !== location.hostname) ref = h; } catch (e) { /* no referrer */ }
-    const body = { tool: 'aprf-reader', reports: loaded.reports.length, streams: ss.length,
-      warnings: loaded.warnings.length, skipped: loaded.skipped.length, copies: loaded.copies, sample, ref };
+    // Skips as one count per reason code. The total is the sum of these, so it
+    // is not sent again as its own field.
+    const skips = {};
+    if (loaded) for (const [, reason] of loaded.skipped) {
+      const code = APRF.skipCode(reason);
+      skips[code] = (skips[code] || 0) + 1;
+    }
+    // copies is not sent: this note fires once, right after the read, before the
+    // visitor has had the chance to copy anything, so it was always zero.
+    const body = { tool: 'aprf-reader', status: outcome,
+      reports: loaded ? loaded.reports.length : 0, streams: ss.length,
+      warnings: loaded ? loaded.warnings.length : 0, skips, sample, ref };
     try {
       fetch('https://dns-audit.com/api/usage', { method: 'POST', mode: 'no-cors', keepalive: true, headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(body) }).catch(() => {});
     } catch (e) { /* never let the note break the page */ }
