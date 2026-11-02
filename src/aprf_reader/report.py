@@ -151,6 +151,10 @@ def _report(obj: object) -> Report:
     for name in ("dkim_domain", "dkim_selector"):
         if not isinstance(h.get(name), str) or not h[name]:
             raise ReportError(f"header.{name} is missing (section 5.2.1)")
+    for name in ("source", "version"):
+        v = h.get(name)
+        if isinstance(v, bool) or not (isinstance(v, (int, float)) or (isinstance(v, str) and v)):
+            raise ReportError(f"header.{name} is missing or not a string or number (section 5.2.1)")
     start, end = _int(h.get("report_start")), _int(h.get("report_end"))
     for name, v in (("report_start", start), ("report_end", end)):
         if v is None:

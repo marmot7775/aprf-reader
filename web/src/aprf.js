@@ -82,6 +82,10 @@
     for (const name of ['dkim_domain', 'dkim_selector']) {
       if (typeof h[name] !== 'string' || !h[name]) throw new ReportError('header.' + name + ' is missing (section 5.2.1)');
     }
+    for (const name of ['source', 'version']) {
+      const v = h[name];
+      if (!((typeof v === 'number' && Number.isFinite(v)) || (typeof v === 'string' && v))) throw new ReportError('header.' + name + ' is missing or not a string or number (section 5.2.1)');
+    }
     for (const name of ['report_start', 'report_end']) {
       const v = h[name];
       if (!isInt(v)) throw new ReportError('header.' + name + ' is not an epoch time (section 5.2.1)');

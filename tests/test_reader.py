@@ -63,6 +63,10 @@ def test_bare_object_and_string_segment():
 @pytest.mark.parametrize("mutate, reason", [
     (lambda o: o.pop("header"), "no header"),
     (lambda o: o["header"].pop("dkim_domain"), "dkim_domain"),
+    (lambda o: o["header"].pop("source"), "header.source"),
+    (lambda o: o["header"].update(source=["X"]), "header.source"),
+    (lambda o: o["header"].pop("version"), "header.version"),
+    (lambda o: o["header"].update(version=None), "header.version"),
     (lambda o: o["header"].update(report_end="yesterday"), "report_end"),
     (lambda o: o["body"][0]["classification"].update(inbox=-1), "not a count"),
     (lambda o: o["body"][0]["engagement"].update(positive=True), "not a count"),
@@ -243,7 +247,7 @@ def test_cli_terminal_when_interactive(monkeypatch, capsys):
 
 def test_stress_set_one_bad_report_does_not_cost_the_file():
     loaded = load([FIX / "stress_100.json"])
-    assert len(loaded.reports) == 86
+    assert len(loaded.reports) == 84
     reasons = {w.rsplit(" ", 1)[-1]: r for w, r in loaded.skipped}
     # s18 spans two days and s19 is shifted an hour: draft section 5.1 requires one UTC day
     assert "section 5.1" in reasons["77"] and "section 5.1" in reasons["78"]
@@ -261,6 +265,8 @@ def test_stress_set_one_bad_report_does_not_cost_the_file():
     assert any(w.startswith('classification key "spam"') for w in warned)
     assert not any('"promotional"' in w or '"forwarded"' in w for w in warned)  # section 6 names them
     assert reasons["73"] == 'body[0].engagement.positive is not a count (section 7): "100"'
+    # Reports 76 (version null) and 91 (version absent) lack a required header field
+    assert reasons["76"] == reasons["91"] == "header.version is missing or not a string or number (section 5.2.1)"
     assert reasons["79"] == "header.report_end is before report_start (section 5.1)"
     assert reasons["81"].startswith("header.report_start looks like milliseconds")
     ss = {(s.source, s.domain, s.selector): s for s in streams(loaded.reports)}
