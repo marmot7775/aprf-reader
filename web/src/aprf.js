@@ -875,12 +875,12 @@ tr.gap td{background:var(--gap);color:var(--muted)}tr.trend td{border-bottom:2px
     [/with no report attached$/, 'no_report_attached'],
     [/report files in one zip$/, 'zip_too_many'],
   ];
-  // Anything unmatched is 'unreadable': a parse failure, which is the one skip
+  // Anything unmatched is 'parse_failed': a parse failure, which is the one skip
   // reason that may mean the reader has a bug rather than the file being wrong.
   function skipCode(reason) {
     const text = typeof reason === 'string' ? reason : '';
     for (const [re, code] of SKIP_CODES) if (re.test(text)) return code;
-    return 'unreadable';
+    return 'parse_failed';
   }
 
   const APRF = { sortFiles, pastedName, DRAFT, CAVEAT, NO_COUNTS, WARNINGS_NOTE, grouped, warningText, copiesLine, ReportError, parse, load, wanted, streams, toDict, toMarkdown, toHtml, span, rowDay, plural, fmt, addDays, dayOffset: between, skipCode };

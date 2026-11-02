@@ -128,7 +128,7 @@ if (!m) throw new Error('note() not found');
 const posted = [];
 const fetch = (url, opts) => { posted.push(opts.body); return Promise.resolve(); };
 const document = { referrer: '' }, location = { hostname: 'aprf.dns-audit.com' };
-const APRF = { streams: () => [{ domain: 'client-example.com' }], skipCode: () => 'unreadable' };
+const APRF = { streams: () => [{ domain: 'client-example.com' }], skipCode: () => 'parse_failed' };
 // eval is intended: it runs only note(), cut from this repository's own app.js, with stubbed globals
 eval(m[0] + ';note({ reports: [1], warnings: [], skipped: [], copies: 0 }, false, "ok")');
 process.stdout.write(posted.join('\n'));

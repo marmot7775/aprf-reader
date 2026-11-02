@@ -71,22 +71,22 @@ def test_a_known_refusal_gets_its_own_code(reason, code):
     "not a report",
     "",
 ])
-def test_anything_else_is_unreadable(reason):
+def test_anything_else_is_parse_failed(reason):
     """A parse failure, which is the code that may mean the reader is at fault."""
-    assert codes([reason]) == ["unreadable"]
+    assert codes([reason]) == ["parse_failed"]
 
 
 def test_a_non_string_reason_does_not_throw():
-    assert codes([None, 7]) == ["unreadable", "unreadable"]
+    assert codes([None, 7]) == ["parse_failed", "parse_failed"]
 
 
 def test_every_reason_literal_in_aprf_js_still_classifies():
-    """The guard: a reworded reason must not silently become 'unreadable'."""
+    """The guard: a reworded reason must not silently become 'parse_failed'."""
     source = APRF_JS.read_text()
     literals = re.findall(r"skip: \[(?:label|name), '([^']+)'\]", source)
     assert literals, "no skip reason literals found; has the shape changed?"
     found = dict(zip(literals, codes(literals)))
-    unclassified = [r for r, c in found.items() if c == "unreadable"]
+    unclassified = [r for r, c in found.items() if c == "parse_failed"]
     assert not unclassified, (
         "these reasons in aprf.js no longer match a skip code, so the usage "
         "note will report them as parse failures: %r" % unclassified
