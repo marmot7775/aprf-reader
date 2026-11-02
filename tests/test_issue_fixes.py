@@ -163,12 +163,36 @@ def test_non_scalar_optional_text_warns_and_is_ignored(tmp_path):
     same([p])
 
 
-def test_missing_source_or_version_is_read_the_same_in_both(tmp_path):
-    # Issue #20 asks whether these should be skipped (the README table) or read (the code and
-    # tests/fixtures/stress_100.json). That is open, so this only holds the two readers together.
-    p = put(tmp_path / "r.json", [rep(0), rep(1, source=..., version=...), rep(2, version=None)])
-    assert len(read(p).reports) == 3
+SOURCE_MISSING = "header.source is missing (section 5.2.1); read, with the provider shown as unknown"
+VERSION_MISSING = "header.version is missing (section 5.2.1); read"
+
+
+def test_missing_source_or_version_is_read_with_a_warning(tmp_path):
+    # Absent or null: still read (source shows as unknown), but the warning names the field
+    p = put(tmp_path / "r.json", [rep(0), rep(1, source=..., version=...), rep(2, version=None), rep(3, source=None)])
+    loaded = read(p)
+    assert len(loaded.reports) == 4 and not loaded.skipped
+    where = lambda w: [x.rsplit(" ", 1)[-1] for v, _, x in loaded.warnings if v == w]
+    assert where(SOURCE_MISSING) == ["2", "4"]
+    assert where(VERSION_MISSING) == ["2", "3"]
+    assert sorted(r.source for r in loaded.reports) == ["P", "P", "unknown", "unknown"]
+    assert "header.source is missing (section 5.2.1)" in to_markdown(loaded)
     same([p])
+
+
+def test_present_source_and_version_raise_no_missing_warning(tmp_path):
+    p = put(tmp_path / "r.json", [rep(0), rep(1, version=0, source="0")])
+    warned = {w for w, _, _ in read(p).warnings}
+    assert SOURCE_MISSING not in warned and VERSION_MISSING not in warned
+    same([p])
+
+
+def test_stress_set_warns_on_the_missing_versions():
+    loaded = load([ROOT / "tests/fixtures/stress_100.json"])
+    assert len(loaded.reports) == 86  # read, not skipped
+    assert [x.rsplit(" ", 1)[-1] for w, _, x in loaded.warnings if w == VERSION_MISSING] == ["76", "91"]
+    assert not [w for w, _, _ in loaded.warnings if w == SOURCE_MISSING]
+    same([ROOT / "tests/fixtures/stress_100.json"])
 
 
 def _nested(depth: int, field: str = "extra_info") -> str:

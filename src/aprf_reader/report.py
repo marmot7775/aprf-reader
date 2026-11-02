@@ -159,6 +159,13 @@ def _text(value: object) -> str | None:
     return str(value) if abs(value) <= MAX_COUNT else None
 
 
+# Section 5.2.1 requires source and version; a report without one is still read, with a warning
+MISSING_HEADER = {
+    "source": "header.source is missing (section 5.2.1); read, with the provider shown as unknown",
+    "version": "header.version is missing (section 5.2.1); read",
+}
+
+
 def _header_text(h: dict, name: str) -> str:
     """A header text field: "" when absent or null, an error when present as a list, object or true."""
     if h.get(name) is None:
@@ -216,6 +223,9 @@ def _report(obj: object) -> Report:
 
 def _warnings(h: dict, segments: tuple[Segment, ...]) -> tuple[tuple[str, str], ...]:
     out = []
+    for name in ("source", "version"):
+        if h.get(name) is None:
+            out.append((MISSING_HEADER[name], ""))
     if "sdi_used" not in h:
         out.append(("no sdi_used field; section 5.2.1 requires N/A when no SDI is used", ""))
     else:
