@@ -156,8 +156,16 @@
     try { return new URL('http://' + d + '/').hostname; } catch (e) { return d; }
   }
   const streamKey = (r) => [r.source, nameKey(r.dkim_domain), r.dkim_selector.toLowerCase()];
+  // Section 5.2.1 requires source and version; a report without one is still read, with a warning
+  const MISSING_HEADER = {
+    source: 'header.source is missing (section 5.2.1); read, with the provider shown as unknown',
+    version: 'header.version is missing (section 5.2.1); read',
+  };
   function reportWarnings(h, segments) {
     const out = [];
+    for (const name of ['source', 'version']) {
+      if (h[name] === null || h[name] === undefined) out.push([MISSING_HEADER[name], '']);
+    }
     if (!('sdi_used' in h)) out.push(['no sdi_used field; section 5.2.1 requires N/A when no SDI is used', '']);
     else {
       const raw = h.sdi_used;

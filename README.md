@@ -109,7 +109,7 @@ the draft. On the web page, Copy for a draft review copies them as text.
 |---|---|
 | Not valid JSON, or not UTF-8 (UTF-16 and UTF-32 are refused, as RFC 8259 says) | 5 |
 | JSON nested more than 32 levels deep | 5 |
-| No header object; `dkim_domain` or `dkim_selector` missing or empty; `report_start` or `report_end` missing or not epoch seconds; `source` or `version` a list, an object or true | 5.2.1 |
+| No header object; `dkim_domain` or `dkim_selector` missing or empty; `report_start` or `report_end` missing or not epoch seconds; `source` or `version` a list, an object or true (a missing `source` or `version` is read, with a warning) | 5.2.1 |
 | Not one UTC day from 00:00:00 to 23:59:59, or ending before it starts | 5.1 |
 | Body not a list of segments; a segment not an object | 5.2.2 |
 | A placement or engagement count that is not a whole number | 6, 7 |
@@ -120,6 +120,7 @@ the draft. On the web page, Copy for a draft review copies them as text.
 | Warning | Section |
 |---|---|
 | `sdi_used` is not N/A, N/F, or the `sdi` value as published in DNS, or is missing | 5.2.1 |
+| `source` or `version` missing or null (a missing `source` shows as `unknown`) | 5.2.1 |
 | Attachment name or subject not `<yyyymmdd>_<DKIM domain>_<DKIM selector>_<source>` | 8 |
 | Message not `multipart/report`; attachment not `application/json` (or `application/gzip` for `.json.gz`) | 8, 8.1 |
 | One attachment holding several reports | 8 |
@@ -162,8 +163,8 @@ discussion is the [thread on the -01 I-D Action](https://mailarchive.ietf.org/ar
 - **A count a report does not carry** (classification or engagement left out, or a body with no
   segments) is missing, not zero: the table leaves it blank, a body with no segments gets a
   `no counts` row, and the trend, range and changes skip the day.
-- **A missing `source` or `version`:** the report is still read, with no
-  warning; the provider shows as `unknown`.
+- **A missing `source` or `version`:** the report is still read, with a
+  warning that names the field; a missing `source` shows as `unknown`.
 - **Counts:** whole numbers only. `100.0` reads as 100; `"100"` and negative
   numbers are refused.
 
