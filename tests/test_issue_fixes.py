@@ -122,14 +122,15 @@ def test_usage_note_carries_no_domains():
     js = r"""
 const fs = require('fs');
 const src = fs.readFileSync(process.argv[1], 'utf8');
-const m = /function note\(loaded, sample\) \{[\s\S]*?\n  \}\n/.exec(src);
+// Any signature: the policy under test is what note() posts, not how it is called
+const m = /function note\([^)]*\) \{[\s\S]*?\n  \}\n/.exec(src);
 if (!m) throw new Error('note() not found');
 const posted = [];
 const fetch = (url, opts) => { posted.push(opts.body); return Promise.resolve(); };
 const document = { referrer: '' }, location = { hostname: 'aprf.dns-audit.com' };
-const APRF = { streams: () => [{ domain: 'client-example.com' }] };
+const APRF = { streams: () => [{ domain: 'client-example.com' }], skipCode: () => 'unreadable' };
 // eval is intended: it runs only note(), cut from this repository's own app.js, with stubbed globals
-eval(m[0] + ';note({ reports: [1], warnings: [], skipped: [], copies: 0 }, false)');
+eval(m[0] + ';note({ reports: [1], warnings: [], skipped: [], copies: 0 }, false, "ok")');
 process.stdout.write(posted.join('\n'));
 """
     out = subprocess.run([NODE, "-e", js, str(ROOT / "web/ui/app.js")], check=True, capture_output=True).stdout.decode()
