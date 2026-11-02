@@ -9,7 +9,7 @@ const APRF = require('../src/aprf.js');
 (async () => {
   const [mode, ...paths] = process.argv.slice(2);
   // "-" is a paste, read from stdin and read last, as the command line does
-  const files = paths.filter((p) => p !== '-').map((p) => ({ name: p, bytes: new Uint8Array(fs.readFileSync(p)) }));
+  const files = APRF.sortFiles(paths.filter((p) => p !== '-').map((p) => ({ name: p, bytes: new Uint8Array(fs.readFileSync(p)) })));
   if (paths.includes('-')) {
     const bytes = new Uint8Array(fs.readFileSync(0));
     files.push({ name: APRF.pastedName(bytes), bytes });

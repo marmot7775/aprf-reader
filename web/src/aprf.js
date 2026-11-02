@@ -23,11 +23,28 @@
   const MAX_BYTES = 10 * 1024 * 1024;
   const DAY_MS = 86400000;
   const NO_COUNTS = 'These reports carry no counts.';
+  // The row for a report day whose body has no segments
+  const NO_COUNTS_ROW = 'no counts';
   const CAVEAT = 'Counts are bucket upper bounds chosen by each provider: a ceiling, not an exact figure. ' +
     'Placement counts mail received that day; engagement counts actions taken that day on mail ' +
     'from any day. Dividing one count by another gives a ratio nobody measured.';
 
   class ReportError extends Error {}
+  // A report nests about four levels deep. Deeper than this is refused (report.py MAX_DEPTH), so a
+  // hostile value cannot exhaust the stack, and the rest of the file is still read.
+  const MAX_DEPTH = 32;
+  const TOO_DEEP = 'JSON nested too deeply';
+  function tooDeep(doc) {
+    const stack = [[doc, 1]];
+    while (stack.length) {
+      const [v, depth] = stack.pop();
+      if (v !== null && typeof v === 'object') {
+        if (depth > MAX_DEPTH) return true;
+        for (const c of Array.isArray(v) ? v : Object.values(v)) stack.push([c, depth + 1]);
+      }
+    }
+    return false;
+  }
   // Placement names section 6 gives as examples; engagement names section 5.2.2 lists
   const NAMED_CLASSIFICATION = ['inbox', 'unwanted', 'forwarded', 'promotional'];
   // sdi as published in DNS (section 4): a header field name, a comma, one separator character
@@ -37,7 +54,22 @@
   // ---- report.py ----
 
   const isInt = (n) => typeof n === 'number' && Number.isInteger(n);
-  const text = (v) => (v === null || v === undefined ? '' : String(v));
+  // Header text as report.py writes it: a string as is, a whole number without a point (1.0 is
+  // "1"), another plain number as both languages print it; null for a list, an object, true,
+  // and a number the two would print differently
+  function text(v) {
+    if (typeof v === 'string') return v;
+    if (typeof v !== 'number' || !isFinite(v)) return null;
+    if (Number.isInteger(v)) return Math.abs(v) <= MAX_COUNT ? String(v) : null;
+    return Math.abs(v) >= 1e-4 && Math.abs(v) < 1e15 ? String(v) : null;
+  }
+  // "" when absent or null, an error when present as a list, object or true
+  function headerText(h, name) {
+    if (h[name] === null || h[name] === undefined) return '';
+    const t = text(h[name]);
+    if (t === null) throw new ReportError('header.' + name + ' is not text or a number (section 5.2.1)');
+    return t;
+  }
 
   function dayOf(epoch) {
     const d = new Date(epoch * 1000);
@@ -50,7 +82,8 @@
   function counts(value, where, section) {
     if (value === null || value === undefined) return {};
     if (typeof value !== 'object' || Array.isArray(value)) throw new ReportError(where + ' is not an object (' + section + ')');
-    const out = {};
+    // No prototype, so a count named constructor or __proto__ is a count like any other
+    const out = Object.create(null);
     for (const [name, n] of Object.entries(value)) {
       if (!isInt(n) || n < 0 || n > MAX_COUNT) throw new ReportError(where + '.' + name + ' is not a count (' + section + '): ' + JSON.stringify(n));
       out[name] = n;
@@ -94,17 +127,19 @@
     const body = obj.body === undefined ? [] : obj.body;
     if (!Array.isArray(body)) throw new ReportError('body is not a list of segments (section 5.2.2)');
     const segments = body.map(segment);
+    const source = headerText(h, 'source');
+    const version = headerText(h, 'version');
     return {
-      source: text(h.source) || 'unknown',
+      source: source || 'unknown',
       dkim_domain: h.dkim_domain,
       dkim_selector: h.dkim_selector,
       report_start: h.report_start,
       report_end: h.report_end,
-      version: text(h.version),
+      version,
       // Comcast's beta sends " - N/A - Beta - Not in use"
-      sdi_used: text(h.sdi_used).replace(/^[ -]+|[ -]+$/g, ''),
-      contact_info: text(h.contact_info),
-      extra_info: text(h.extra_info),
+      sdi_used: (text(h.sdi_used) || '').replace(/^[ -]+|[ -]+$/g, ''),
+      contact_info: text(h.contact_info) || '',
+      extra_info: text(h.extra_info) || '',
       segments,
       warnings: reportWarnings(h, segments).concat(body.flatMap((s, i) => (s && typeof s === 'object' && typeof s.segment === 'string'
         ? [['segment is a string; section 5.2.2 says a list of strings. Read as a one-item list', 'body[' + i + ']']] : []))),
@@ -130,6 +165,9 @@
         out.push(['sdi_used is not N/A, N/F, or the sdi value as published in DNS (section 5.2.1)', JSON.stringify(raw)]);
       }
     }
+    for (const name of ['contact_info', 'extra_info']) {
+      if (h[name] !== null && h[name] !== undefined && text(h[name]) === null) out.push(['header.' + name + ' is not text or a number (section 5.2.1); ignored', '']);
+    }
     const keys = (attr) => [...new Set(segments.flatMap((g) => Object.keys(g[attr])))].sort(cmp);
     for (const k of keys('classification')) {
       if (!NAMED_CLASSIFICATION.includes(k)) out.push(['classification key ' + JSON.stringify(k) + ' is not one section 6 names (inbox, unwanted, forwarded, promotional); read as given', '']);
@@ -149,12 +187,18 @@
     try {
       doc = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
     } catch (e) {
-      throw new ReportError(e instanceof RangeError ? 'JSON nested too deeply' : 'not valid JSON, which section 5 requires: ' + e.message);
+      throw new ReportError(e instanceof RangeError ? TOO_DEEP : 'not valid JSON, which section 5 requires: ' + e.message);
     }
     const items = Array.isArray(doc) ? doc : [doc];
     if (!items.length) throw new ReportError('empty list');
     return items.map((o) => {
-      try { return report(o); } catch (e) { if (e instanceof ReportError) return e; throw e; }
+      if (tooDeep(o)) return new ReportError(TOO_DEEP);
+      try { return report(o); } catch (e) {
+        if (e instanceof ReportError) return e;
+        // The stack ran out on a deeply nested value: this report is refused, the rest of the file is not
+        if (e instanceof RangeError) return new ReportError(TOO_DEEP);
+        throw e;
+      }
     });
   }
 
@@ -201,20 +245,44 @@
     return out;
   }
 
+  // Header parameters. RFC 2231: name*=charset'lang'%XX is percent-encoded, and a long value
+  // may be split into name*0, name*1 (each "name*N*" when encoded), joined in numeric order.
   function params(value) {
-    const out = {};
+    const out = Object.create(null);
+    const parts = Object.create(null);
     const re = /;\s*([\w.*-]+)\s*=\s*("(?:[^"\\]|\\.)*"|[^;\s]*)/g;
     let m;
     while ((m = re.exec(value))) {
       let v = m[2];
       if (v.startsWith('"')) v = v.slice(1, -1).replace(/\\(.)/g, '$1');
-      let k = m[1].toLowerCase();
-      // RFC 2231: filename*=utf-8''name%20here
-      if (k.endsWith('*')) {
-        k = k.slice(0, -1);
-        try { v = decodeURIComponent(v.replace(/^[^']*'[^']*'/, '')); } catch (e) { /* keep raw */ }
+      const k = m[1].toLowerCase();
+      const cont = /^(.+?)\*(\d+)(\*?)$/.exec(k);
+      if (cont) {
+        (parts[cont[1]] = parts[cont[1]] || []).push({ n: Number(cont[2]), v, encoded: cont[3] === '*' });
+        continue;
       }
-      out[k] = v;
+      if (k.endsWith('*')) {
+        const name = k.slice(0, -1);
+        try { v = decodeURIComponent(v.replace(/^[^']*'[^']*'/, '')); } catch (e) { /* keep raw */ }
+        out[name] = v;
+      } else out[k] = v;
+    }
+    for (const [name, list] of Object.entries(parts)) {
+      if (name in out) continue;
+      list.sort((x, y) => x.n - y.n);
+      // Encoded pieces are decoded together, so a character split across pieces survives
+      let joined = '';
+      let pending = '';
+      const flush = () => {
+        try { joined += decodeURIComponent(pending); } catch (e) { joined += pending; }
+        pending = '';
+      };
+      list.forEach((p, i) => {
+        if (p.encoded) pending += i === 0 ? p.v.replace(/^[^']*'[^']*'/, '') : p.v;
+        else { flush(); joined += p.v; }
+      });
+      flush();
+      out[name] = joined;
     }
     return out;
   }
@@ -449,6 +517,10 @@
     return latin1(new Uint8Array(await subtle.digest('SHA-256', bytes)));
   }
 
+  // Files are read in name order: by full path, one UTF-16 code unit at a time (what < compares),
+  // which load.py name_order matches. Pass the files to load() through this.
+  const sortFiles = (files) => files.slice().sort((a, b) => cmp(a.name, b.name));
+
   // files: [{ name, bytes }] in the order to read them. Returns { reports, skipped }.
   async function load(files) {
     // warnings: [warning, detail, where]; copies: files whose report bytes were already read
@@ -586,27 +658,38 @@
     let prev = null;
     for (const d of days) {
       if (prev !== null && between(prev, d) > 1) s.rows.push({ day: addDays(prev, 1), until: addDays(d, -1), segment: null, values: [] });
-      for (const seg of byDay.get(d).segments) {
-        s.rows.push({ day: d, until: d, segment: seg.path.map((p) => p || '(blank)').join(' / ') || 'all mail', values: s.columns.map(([a, k]) => (k in seg[a] ? seg[a][k] : null)) });
+      const segments = byDay.get(d).segments;
+      // A report with no segments is a day the provider reported, with nothing to count
+      if (!segments.length) s.rows.push({ day: d, until: d, segment: NO_COUNTS_ROW, values: s.columns.map(() => null) });
+      for (const seg of segments) {
+        s.rows.push({ day: d, until: d, segment: seg.path.map((p) => p || '(blank)').join(' / ') || 'all mail', values: s.columns.map(([a, k]) => (Object.hasOwn(seg[a], k) ? seg[a][k] : null)) });
       }
       prev = d;
     }
 
-    // [day offset from first, sum across segments] for each report day
-    s.trend = (col) => {
+    // [day offset from first, sum across segments] for each report day; null for a day whose
+    // segments do not carry the count, which is missing, not zero
+    const series = (col) => {
       const [a, k] = s.columns[col];
-      return days.map((d) => [between(s.first, d), byDay.get(d).segments.reduce((t, seg) => t + (seg[a][k] || 0), 0)]);
+      return days.map((d) => {
+        const have = byDay.get(d).segments.filter((seg) => Object.hasOwn(seg[a], k)).map((seg) => seg[a][k]);
+        return [between(s.first, d), have.length ? have.reduce((t, v) => t + v, 0) : null];
+      });
     };
+    // The series without its missing days; a skipped day leaves a gap in the line
+    s.trend = (col) => series(col).filter((p) => p[1] !== null);
 
     // Day-to-day moves big enough to look at, between one report day and the next
     const changes = [];
     s.columns.forEach(([, k], col) => {
       const rule = CHANGES[k];
       if (!rule) return;
-      const pts = s.trend(col);
+      const pts = series(col);
       for (let i = 1; i < pts.length; i++) {
         const [x0, old] = pts[i - 1];
         const [x1, now] = pts[i];
+        // Nothing is computed across a day that does not carry the count
+        if (old === null || now === null) continue;
         // Comcast's buckets are 100 wide, so a move under two buckets is noise
         let verb;
         if (rule === 'rise' && now >= 2 * old && now - old >= MIN_MOVE) verb = 'rose';
@@ -682,7 +765,9 @@
   // ---- render.py (Markdown; the page draws its own view) ----
 
   const n = (v) => (v === null ? '' : fmt(v));
-  const md = (t) => t.replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\n/g, ' ');
+  // CommonMark section 2.1 ends a line at LF, CR or CRLF; U+2028 and U+2029 are line breaks to
+  // other readers. Each becomes one space, so provider text cannot split a table row.
+  const md = (t) => t.replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\r\n|[\r\n\u2028\u2029]/g, ' ');
   const plural = (k, word) => k + ' ' + word + (k === 1 ? '' : 's');
   const countsLine = (loaded, ss) => plural(loaded.reports.length, 'report') + ' in ' + plural(ss.length, 'stream') + '.';
   const span = (s) => (s.first === s.last ? s.first : s.first + ' to ' + s.last) + ': ' + plural(s.days.length, 'report') + (s.missing ? ', ' + plural(s.missing, 'day') + ' with no report' : '');
@@ -773,12 +858,12 @@ tr.gap td{background:var(--gap);color:var(--muted)}tr.trend td{border-bottom:2px
     if (loaded.warnings.length) parts.push('<h2>Warnings</h2><p class=muted>' + WARNINGS_NOTE + '</p><ul>' + grouped(loaded.warnings).map((g) => '<li>' + esc(warningText(g))).join('') + '</ul>');
     if (loaded.skipped.length) parts.push('<h2>Skipped</h2><ul>' + loaded.skipped.map(([w, r]) => '<li>' + esc(w) + ': ' + esc(r)).join('') + '</ul>');
     if (loaded.copies) parts.push('<p class=muted>' + esc(copiesLine(loaded.copies)) + '</p>');
-    parts.push('<p class=muted>Read by aprf-reader ' + esc(version) + ' against ' + DRAFT + '. Nothing left this computer.</p>');
+    parts.push('<p class=muted>Read by aprf-reader ' + esc(version) + ' against ' + DRAFT + '.</p>');
     parts.push('</body></html>');
     return parts.join('\n') + '\n';
   }
 
-  const APRF = { pastedName, DRAFT, CAVEAT, NO_COUNTS, WARNINGS_NOTE, grouped, warningText, copiesLine, ReportError, parse, load, wanted, streams, toDict, toMarkdown, toHtml, span, rowDay, plural, fmt, addDays, dayOffset: between };
+  const APRF = { sortFiles, pastedName, DRAFT, CAVEAT, NO_COUNTS, WARNINGS_NOTE, grouped, warningText, copiesLine, ReportError, parse, load, wanted, streams, toDict, toMarkdown, toHtml, span, rowDay, plural, fmt, addDays, dayOffset: between };
   root.APRF = APRF;
   if (typeof module !== 'undefined' && module.exports) module.exports = APRF;
 })(typeof window !== 'undefined' ? window : globalThis);

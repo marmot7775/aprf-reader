@@ -48,11 +48,10 @@
   }
 
   async function readAll(entries) {
-    // entries: [{ name, file }]; sorted by path so results never depend on drop order
-    entries.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+    // entries: [{ name, file }]; read in name order so results never depend on drop order
     const files = [];
     for (const { name, file } of entries) files.push({ name, bytes: new Uint8Array(await file.arrayBuffer()) });
-    return files;
+    return APRF.sortFiles(files);
   }
 
   async function run(entries, label) {
@@ -74,16 +73,15 @@
   }
 
   // One usage note per run to dns-audit.com, so its owner can see the page is used.
-  // Counts and signing domains only, never report contents (see the privacy page).
+  // Counts only: never report contents, domains or addresses (CLAUDE.md).
   // text/plain needs no CORS preflight; the reply is not read, and a failure is ignored.
   function note(loaded, sample) {
     const ss = APRF.streams(loaded.reports);
-    const domains = [...new Set(ss.map((x) => x.domain))].slice(0, 20);
     // Where the visitor came from, host only; a link within the site is not a source
     let ref;
     try { const h = new URL(document.referrer).hostname; if (h && h !== location.hostname) ref = h; } catch (e) { /* no referrer */ }
     const body = { tool: 'aprf-reader', reports: loaded.reports.length, streams: ss.length,
-      warnings: loaded.warnings.length, skipped: loaded.skipped.length, copies: loaded.copies, domains, sample, ref };
+      warnings: loaded.warnings.length, skipped: loaded.skipped.length, copies: loaded.copies, sample, ref };
     try {
       fetch('https://dns-audit.com/api/usage', { method: 'POST', mode: 'no-cors', keepalive: true, headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(body) }).catch(() => {});
     } catch (e) { /* never let the note break the page */ }

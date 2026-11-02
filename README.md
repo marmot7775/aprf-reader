@@ -107,8 +107,9 @@ the draft. On the web page, Copy for a draft review copies them as text.
 
 | Problem | Section |
 |---|---|
-| Not valid JSON | 5 |
-| A required header field missing or of the wrong type; times not in epoch seconds | 5.2.1 |
+| Not valid JSON, or not UTF-8 (UTF-16 and UTF-32 are refused, as RFC 8259 says) | 5 |
+| JSON nested more than 32 levels deep | 5 |
+| A required header field missing or of the wrong type; times not in epoch seconds; `source` or `version` a list, an object or true | 5.2.1 |
 | Not one UTC day from 00:00:00 to 23:59:59, or ending before it starts | 5.1 |
 | Body not a list of segments; a segment not an object | 5.2.2 |
 | A placement or engagement count that is not a whole number | 6, 7 |
@@ -122,6 +123,7 @@ the draft. On the web page, Copy for a draft review copies them as text.
 | Attachment name or subject not `<yyyymmdd>_<DKIM domain>_<DKIM selector>_<source>` | 8 |
 | Message not `multipart/report`; attachment not `application/json` (or `application/gzip` for `.json.gz`) | 8, 8.1 |
 | One attachment holding several reports | 8 |
+| `contact_info` or `extra_info` not text or a number (ignored) | 5.2.1 |
 | A placement key other than the four section 6 names, or an engagement key other than positive, neutral and negative | 6, 5.2.2 |
 | A name or subject that writes `/` or `*` some other way, as a file name must | 8 is silent |
 | The same day twice from one provider | 8.2 |
@@ -155,6 +157,11 @@ discussion is the [thread on the -01 I-D Action](https://mailarchive.ietf.org/ar
 - **The reporting window:** section 5.1 says a report MUST cover one UTC day,
   from 00:00:00 to 23:59:59. A report that covers more, or is shifted off the
   day boundary, is skipped with a reason that names section 5.1.
+- **Files:** read in name order, by full path, whether given one by one or found in a folder,
+  so the page and the command line keep the same copy of a repeated day.
+- **A count a report does not carry** (classification or engagement left out, or a body with no
+  segments) is missing, not zero: the table leaves it blank, a body with no segments gets a
+  `no counts` row, and the trend, range and changes skip the day.
 - **Counts:** whole numbers only. `100.0` reads as 100; `"100"` and negative
   numbers are refused.
 

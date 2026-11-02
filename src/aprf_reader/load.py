@@ -48,12 +48,22 @@ DUPLICATE_DAY = ("the same day came twice from one provider; the later copy repl
                  "as section 8.2 says. Later means read later: arrival order in a mailbox, name order for files")
 
 
-def _files(paths: Iterable[Path]) -> Iterator[Path]:
+def name_order(name: str) -> bytes:
+    """The order files are read in: by full path, one UTF-16 code unit at a time, as the web
+    page compares strings, so the same files give the same numbers in both."""
+    return name.encode("utf-16-be", "surrogatepass")
+
+
+def _files(paths: Iterable[Path]) -> list[Path]:
+    """Every file named or found in a folder, in one global name order (README: files are read
+    in name order), however the paths were given."""
+    found = []
     for p in paths:
         if p.is_dir():
-            yield from sorted(f for f in p.rglob("*") if f.is_file() and (f.name.lower().endswith(SUFFIXES) or _is_mbox(f)))
+            found += (f for f in p.rglob("*") if f.is_file() and (f.name.lower().endswith(SUFFIXES) or _is_mbox(f)))
         else:
-            yield p
+            found.append(p)
+    return sorted(found, key=lambda f: name_order(str(f)))
 
 
 def _is_mbox(path: Path) -> bool:
