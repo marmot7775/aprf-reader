@@ -71,6 +71,10 @@ def test_all_fixtures_together():
     same(sorted(FIX.glob("*.json")))
 
 
+def test_rollup_standins_read_the_same():
+    same(sorted((FIX / "rollup").glob("*.eml")))
+
+
 def test_files_emails_and_mailboxes(tmp_path):
     def put(name: str, data: bytes) -> Path:
         (tmp_path / name).write_bytes(data)

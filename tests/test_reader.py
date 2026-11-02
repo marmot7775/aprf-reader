@@ -3,6 +3,7 @@ import json
 import mailbox
 import re
 from datetime import date
+from email import message_from_bytes, policy
 from email.message import EmailMessage
 from pathlib import Path
 
@@ -273,3 +274,55 @@ def test_stress_set_one_bad_report_does_not_cost_the_file():
     assert "(blank)" in [r.segment for r in blank.rows]
     assert not ss[("Comcast/Xfinity", "sender.example", "s8")].columns
     assert "These reports carry no counts." in to_markdown(loaded)
+
+
+# What stands in for a rolled-up selector or domain in the section 8 name and subject is
+# unsettled in -01; "!", an empty field and "*" are all accepted until -02 decides.
+ROLLUP = FIX / "rollup"
+
+
+def _section_8(loaded) -> list:
+    # Name, subject and Content-Type checks; not the section 8.2 duplicate note
+    return [(w, d) for w, d, _ in loaded.warnings if re.search(r"sections? 8(?!\.\d)", w)]
+
+
+@pytest.mark.parametrize("name", sorted(p.name for p in ROLLUP.glob("*.eml")))
+def test_rollup_standins_pass_section_8(name):
+    loaded = load([ROLLUP / name])
+    assert len(loaded.reports) == 1 and not loaded.skipped
+    assert _section_8(loaded) == []
+
+
+def _rewrite(src: Path, dst: Path, name: str, **header) -> Path:
+    """A copy of a roll-up fixture with a new section 8 name and changed header fields."""
+    msg = message_from_bytes(src.read_bytes(), policy=policy.default)
+    part = next(msg.iter_attachments())
+    (doc,) = json.loads(part.get_content())
+    doc["header"].update(header)
+    part.set_content(json.dumps([doc]).encode(), maintype="application", subtype="json", filename=name + ".json")
+    msg.replace_header("Subject", "APRF: " + name)
+    dst.write_bytes(msg.as_bytes())
+    return dst
+
+
+def test_standins_apply_only_to_a_rolled_up_field(tmp_path):
+    # A literal selector written as "!" in the name, or a rolled-up selector written as a
+    # real one, is still a mismatch: a warning, not a rejection.
+    src = ROLLUP / "selector_bang.eml"
+    cases = [_rewrite(src, tmp_path / "literal.eml", "20261001_example.com_!_ExampleMail", dkim_selector="s1"),
+             _rewrite(src, tmp_path / "named.eml", "20261001_example.com_s1_ExampleMail")]
+    for path in cases:
+        loaded = load([path])
+        assert len(loaded.reports) == 1 and not loaded.skipped
+        assert [w.split(":")[0] for w, _ in _section_8(loaded)] == [
+            "attachment name does not follow section 8", "subject does not follow section 8"], path.name
+
+
+def test_rollup_spellings_dedupe_on_header_fields():
+    # Section 8.2 matching keys on the header, not the raw name: three spellings of one
+    # rolled-up day are one day, and the last one read wins.
+    loaded = load([ROLLUP])
+    assert sorted((r.dkim_domain, r.dkim_selector, r.segments[0].classification["inbox"])
+                  for r in loaded.reports) == [("*.example.com", "s1", 2200), ("example.com", "*", 1200)]
+    dups = [w for w, _, _ in loaded.warnings if w.startswith("the same day came twice")]
+    assert len(dups) == 4 and _section_8(loaded) == []
