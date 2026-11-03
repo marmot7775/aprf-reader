@@ -29,6 +29,7 @@
   const ICON = {
     look: 'M8 2.5 14.5 13.5h-13zM8 6.5v3M8 11.6v.1',
     ok: 'M3 8.5 6.5 12 13 4.5',
+    none: 'M4 8h8',
     copy: 'M5.5 5.5h8v8h-8zM10.5 5.5v-3h-8v8h3',
     save: 'M8 2.5v8m0 0-3-3m3 3 3-3M2.5 11v2.5h11V11',
   };
@@ -144,7 +145,7 @@
     const y = (v) => T + (1 - v / top) * (H - T - B);
     const svg = s('svg', { viewBox: '0 0 ' + W + ' ' + H, role: 'img', tabindex: '0' });
     const latest = pts[pts.length - 1][1];
-    svg.setAttribute('aria-label', name + ' per day from ' + range(stream.first, stream.last) + '. Latest up to ' + APRF.fmt(latest) + '. Use the arrow keys to read each day.');
+    svg.setAttribute('aria-label', name + ' per day from ' + range(stream.first, stream.last) + '. Latest ' + APRF.fmt(latest) + '. Use the arrow keys to read each day.');
 
     for (const v of [0, top / 2, top]) {
       svg.append(s('line', { class: 'grid', x1: L, x2: W - R, y1: y(v), y2: y(v) }));
@@ -187,14 +188,18 @@
     const dot = s('circle', { class: 'dot', r: 4, visibility: 'hidden' });
     svg.append(cross, dot);
     const tip = h('div', { class: 'tip', hidden: true });
+    // The day picked by key or tap, read out by a screen reader; hovering does not announce
+    const said = h('p', { class: 'sr-only', 'aria-live': 'polite' });
     let at = null;
-    function show(dx) {
+    function show(dx, announce) {
       at = Math.max(0, Math.min(span, dx));
       const p = pts.find((q) => q[0] === at);
       const day = APRF.addDays(stream.first, at);
       cross.setAttribute('x1', x(at)); cross.setAttribute('x2', x(at)); cross.setAttribute('visibility', 'visible');
       if (p) { dot.setAttribute('cx', x(at)); dot.setAttribute('cy', y(p[1])); dot.setAttribute('visibility', 'visible'); } else dot.setAttribute('visibility', 'hidden');
-      tip.replaceChildren(h('b', {}, p ? 'up to ' + APRF.fmt(p[1]) : 'no report'), h('span', {}, when(day, true)));
+      const value = p ? APRF.fmt(p[1]) : 'no report';
+      tip.replaceChildren(h('b', {}, value), h('span', {}, when(day, true)));
+      if (announce) said.textContent = name + ', ' + when(day, true) + ': ' + value;
       tip.hidden = false;
       const box = svg.getBoundingClientRect();
       const host = svg.parentElement.getBoundingClientRect();
@@ -211,7 +216,10 @@
       return Math.round(raw);
     };
     svg.addEventListener('pointermove', (e) => show(nearest(e.clientX)));
-    svg.addEventListener('pointerleave', hide);
+    // A tap sends no move, so a press shows the day too; touch-action pan-y keeps scrolling
+    svg.addEventListener('pointerdown', (e) => show(nearest(e.clientX), true));
+    // A finger lifting also leaves, which would hide the tip a tap just showed
+    svg.addEventListener('pointerleave', (e) => { if (e.pointerType !== 'touch') hide(); });
     svg.addEventListener('blur', hide);
     svg.addEventListener('keydown', (e) => {
       const i = pts.findIndex((p) => p[0] === at);
@@ -223,7 +231,7 @@
       else if (e.key === 'Escape') { hide(); return; }
       if (!next) return;
       e.preventDefault();
-      show(next[0]);
+      show(next[0], true);
     });
 
     const vals = pts.map((p) => p[1]);
@@ -231,7 +239,7 @@
       h('p', { class: 'name' }, name),
       h('p', { class: 'latest' }, APRF.fmt(latest), ' ', h('small', {}, 'on ' + when(stream.last))),
       h('p', { class: 'sub' }, pts.length > 1 ? 'Daily range ' + APRF.fmt(Math.min(...vals)) + ' to ' + APRF.fmt(Math.max(...vals)) : 'One day so far'),
-      svg, tip);
+      svg, tip, said);
   }
 
   // ---- results ----
@@ -247,6 +255,8 @@
     const changes = st.changeList.length
       ? h('ul', { class: 'changes' }, st.changeList.map((c) => h('li', {}, h('span', { class: 'chip look' }, icon(ICON.look), 'Look'),
           h('span', {}, h('b', {}, c.name[0].toUpperCase() + c.name.slice(1) + ' ' + c.verb), ' from ' + APRF.fmt(c.from) + ' on ' + when(c.prev) + ' to ' + APRF.fmt(c.to) + ' on ' + when(c.day, true) + '.'))))
+      // No changes is only steady when something was compared
+      : st.notCompared ? h('ul', { class: 'changes' }, h('li', {}, h('span', { class: 'chip none' }, icon(ICON.none), 'Not checked'), h('span', {}, st.notCompared)))
       : h('ul', { class: 'changes' }, h('li', {}, h('span', { class: 'chip ok' }, icon(ICON.ok), 'Steady'), h('span', {}, 'No big day-to-day moves in inbox, unwanted, or negative counts.')));
     const table = h('table', {},
       h('thead', {}, h('tr', {}, h('th', { scope: 'col' }, 'Day'), h('th', { scope: 'col' }, 'Segment'), cols.map((c) => h('th', { scope: 'col' }, c)))),
@@ -255,7 +265,7 @@
         : h('tr', {}, h('td', {}, row.day), h('td', {}, row.segment), row.values.map((v) => h('td', {}, v === null ? '' : APRF.fmt(v)))))));
     return h('article', { class: 'card stream results-enter' },
       h('div', { class: 'stream-head' },
-        h('h3', {}, st.domain, ' ', h('span', { class: 'sel' }, 'selector ' + st.selector)),
+        h('h3', {}, st.heading, ' ', h('span', { class: 'sel' }, 'selector ' + st.selector)),
         h('p', { class: 'meta' }, meta)),
       h('div', { class: 'charts' }, cols.map((_, i) => chart(st, i))),
       h('div', {}, h('p', { class: 'eyebrow', style: 'margin-bottom:8px' }, 'Changes worth a look'), changes),

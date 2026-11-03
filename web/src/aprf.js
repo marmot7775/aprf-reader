@@ -15,7 +15,12 @@
   const MAX_COUNT = Number.MAX_SAFE_INTEGER;
   // Counts where a jump up is bad news, or a drop is
   const CHANGES = { unwanted: 'rise', negative: 'rise', inbox: 'fall' };
+  // A move must be at least two of the stream's steps, and never needs to be more than 200:
+  // Comcast counts in steps of 100. Section 6 leaves bucketing and bucket size to each provider.
   const MIN_MOVE = 200;
+  // Why a stream with no changes was not checked for any (summary.py Stream.not_compared)
+  const ONE_REPORT = 'One report day so far, so nothing to compare.';
+  const NOTHING_COMPARED = 'Nothing to compare: no two reports in a row carry an inbox, unwanted or negative count.';
   const SUFFIXES = ['.json', '.json.gz', '.eml', '.mbox', '.zip'];
   // A zip of a year of daily reports for a few selectors is a few thousand files
   const MAX_ZIP_ENTRIES = 20000;
@@ -25,7 +30,8 @@
   const NO_COUNTS = 'These reports carry no counts.';
   // The row for a report day whose body has no segments
   const NO_COUNTS_ROW = 'no counts';
-  const CAVEAT = 'Counts are bucket upper bounds chosen by each provider: a ceiling, not an exact figure. ' +
+  const CAVEAT = "Providers may round counts into buckets of a size they choose (Comcast's are steps of 100). " +
+    "A bucketed count is the bucket's upper bound: a ceiling, not an exact figure. " +
     'Placement counts mail received that day; engagement counts actions taken that day on mail ' +
     'from any day. Dividing one count by another gives a ratio nobody measured.';
 
@@ -47,8 +53,9 @@
   }
   // Placement names section 6 gives as examples; engagement names section 5.2.2 lists
   const NAMED_CLASSIFICATION = ['inbox', 'unwanted', 'forwarded', 'promotional'];
-  // sdi as published in DNS (section 4): a header field name, a comma, one separator character
-  const SDI_FORMAT = /^[!-9;-~]+,\S$/;
+  // sdi as published in DNS (section 4): a header field name, a comma, one separator character.
+  // Section 4.1: the separator MUST NOT be any of ";=,". The field name may hold ";" itself.
+  const SDI_FORMAT = /^[!-9;-~]+,[^\s;=,]$/;
   const ONE_DAY = 'not one UTC day from 00:00:00 to 23:59:59, which draft section 5.1 requires';
 
   // ---- report.py ----
@@ -86,7 +93,8 @@
     const out = Object.create(null);
     for (const [name, n] of Object.entries(value)) {
       if (!isInt(n) || n < 0 || n > MAX_COUNT) throw new ReportError(where + '.' + name + ' is not a count (' + section + '): ' + JSON.stringify(n));
-      out[name] = n;
+      // -0 is zero: Python has no negative zero, and toLocaleString would print "-0"
+      out[name] = n === 0 ? 0 : n;
     }
     return out;
   }
@@ -133,8 +141,9 @@
       source: source || 'unknown',
       dkim_domain: h.dkim_domain,
       dkim_selector: h.dkim_selector,
-      report_start: h.report_start,
-      report_end: h.report_end,
+      // + 0 turns -0 into 0, as Python reads it
+      report_start: h.report_start + 0,
+      report_end: h.report_end + 0,
       version,
       // Comcast's beta sends " - N/A - Beta - Not in use"
       sdi_used: (text(h.sdi_used) || '').replace(/^[ -]+|[ -]+$/g, ''),
@@ -188,12 +197,19 @@
 
   const keyOf = (r) => JSON.stringify(streamKey(r).concat([r.day]));
 
+  // A backslash escape in JSON text. A \uD800 to \uDFFF escape that is not half of a pair is a
+  // lone surrogate: valid JSON, but no character. Both readers read it as U+FFFD (report.py
+  // _no_lone_surrogates), so sorting and output agree. Each backslash takes the character after
+  // it, so an escaped backslash is never read as the start of an escape.
+  const ESCAPE = /\\(?:u[dD][89abAB][0-9a-fA-F]{2}\\u[dD][c-fC-F][0-9a-fA-F]{2}|(u[dD][89a-fA-F][0-9a-fA-F]{2})|[\s\S])/g;
+  const noLoneSurrogates = (t) => (/\\u[dD][89a-fA-F]/.test(t) ? t.replace(ESCAPE, (m, lone) => (lone ? '\\ufffd' : m)) : t);
+
   // Each report in a document, or the reason it cannot be read, so one bad
   // report does not cost the rest of the file
   function parseItems(bytes) {
     let doc;
     try {
-      doc = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+      doc = JSON.parse(noLoneSurrogates(new TextDecoder('utf-8', { fatal: true }).decode(bytes)));
     } catch (e) {
       throw new ReportError(e instanceof RangeError ? TOO_DEEP : 'not valid JSON, which section 5 requires: ' + e.message);
     }
@@ -536,15 +552,26 @@
     const parsed = new Map();
     const seenKeys = new Map();
 
+    // Whether reading these reports again would change nothing: for each day they hold, the
+    // copy kept is still the last one they give for that day (load.py current)
+    function current(items) {
+      const last = new Map();
+      for (const r of items) if (!(r instanceof ReportError)) last.set(keyOf(r), r);
+      return [...last].every(([k, r]) => seenKeys.has(k) && seenKeys.get(k)[1] === r);
+    }
+
     function add(where, data, mail, digest) {
-      const copy = parsed.has(digest);
-      if (!copy) {
+      const seen = parsed.has(digest);
+      if (!seen) {
         try { parsed.set(digest, parseItems(data)); } catch (e) {
           if (!(e instanceof ReportError)) throw e;
           parsed.set(digest, e);
         }
       }
       const items = parsed.get(digest);
+      // A file read before is a copy only while what it holds is what is kept. After a changed
+      // copy of the same day (A, then B, then A again), A is the later copy and replaces B.
+      const copy = seen && (items instanceof ReportError || current(items));
       // An email is checked even when its report was already read from another file
       if (mail && !(items instanceof ReportError)) for (const [w, d] of mailWarnings(mail, items)) out.warnings.push([w, d, where]);
       if (copy) { out.copies++; return; }
@@ -654,9 +681,16 @@
     return order.filter((k) => seen.has(k)).concat([...seen].filter((k) => !order.includes(k)).sort(cmp));
   }
 
-  function stream(source, domain, selector, byDay) {
+  const gcd = (a, b) => { while (b) [a, b] = [b, a % b]; return a; };
+
+  // domain and selector as the stream's first report writes them; domainKey is the form it is
+  // grouped by (summary.py Stream)
+  function stream(source, domainKey, byDay) {
     const days = [...byDay.keys()].sort(cmp);
-    const s = { source, domain, selector, byDay, days, first: days[0], last: days[days.length - 1] };
+    const head = byDay.get(days[0]);
+    const s = { source, domain: head.dkim_domain, domainKey, selector: head.dkim_selector, byDay, days, first: days[0], last: days[days.length - 1] };
+    // The domain as written, with the form it is grouped by when that looks different
+    s.heading = s.domain.toLowerCase() === domainKey ? s.domain : s.domain + ' (' + domainKey + ')';
     s.missing = between(s.first, s.last) + 1 - days.length;
     s.columns = names(byDay, 'classification', PLACEMENT_NAMES).map((k) => ['classification', k])
       .concat(names(byDay, 'engagement', ENGAGEMENT_NAMES).map((k) => ['engagement', k]));
@@ -687,6 +721,20 @@
     // The series without its missing days; a skipped day leaves a gap in the line
     s.trend = (col) => series(col).filter((p) => p[1] !== null);
 
+    // The step every count is a multiple of: 100 for Comcast's buckets, 1 for exact counts, 0
+    // when every count is zero. A move of one step is rounding, so a change is two, up to 200.
+    let step = 0;
+    for (const r of byDay.values()) for (const g of r.segments) for (const a of ['classification', 'engagement']) for (const v of Object.values(g[a])) step = gcd(step, v);
+    const minMove = step ? Math.min(MIN_MOVE, 2 * step) : MIN_MOVE;
+
+    // Why no day could be held against the one before, or null when one was
+    s.notCompared = days.length < 2 ? ONE_REPORT : NOTHING_COMPARED;
+    s.columns.forEach(([, k], col) => {
+      if (!CHANGES[k] || days.length < 2) return;
+      const pts = series(col);
+      if (pts.some((p, i) => i && p[1] !== null && pts[i - 1][1] !== null)) s.notCompared = null;
+    });
+
     // Day-to-day moves big enough to look at, between one report day and the next
     const changes = [];
     s.columns.forEach(([, k], col) => {
@@ -698,10 +746,10 @@
         const [x1, now] = pts[i];
         // Nothing is computed across a day that does not carry the count
         if (old === null || now === null) continue;
-        // Comcast's buckets are 100 wide, so a move under two buckets is noise
+        // A move of one bucket is rounding (minMove)
         let verb;
-        if (rule === 'rise' && now >= 2 * old && now - old >= MIN_MOVE) verb = 'rose';
-        else if (rule === 'fall' && 2 * now <= old && old - now >= MIN_MOVE) verb = 'fell';
+        if (rule === 'rise' && now >= 2 * old && now - old >= minMove) verb = 'rose';
+        else if (rule === 'fall' && 2 * now <= old && old - now >= minMove) verb = 'fell';
         else continue;
         changes.push({ text: k + ' ' + verb + ' from ' + fmt(old) + ' on ' + addDays(s.first, x0) + ' to ' + fmt(now) + ' on ' + addDays(s.first, x1) + '.', day: addDays(s.first, x1), prev: addDays(s.first, x0), from: old, to: now, name: k, verb, col });
       }
@@ -735,7 +783,7 @@
     return [...groups.keys()].sort((a, b) => {
       const x = JSON.parse(a); const y = JSON.parse(b);
       return cmp(x[0], y[0]) || cmp(x[1], y[1]) || cmp(x[2], y[2]);
-    }).map((k) => { const [src, dom, sel] = JSON.parse(k); return stream(src, dom, sel, groups.get(k)); });
+    }).map((k) => { const [src, dom] = JSON.parse(k); return stream(src, dom, groups.get(k)); });
   }
 
   // [warning, times, first where, first detail], in the order first seen
@@ -755,14 +803,14 @@
     return {
       reports: loaded.reports.length,
       streams: streams(loaded.reports).map((s) => ({
-        source: s.source, domain: s.domain, selector: s.selector,
+        source: s.source, domain: s.domain, domain_key: s.domainKey, selector: s.selector,
         first: s.first, last: s.last, missing_days: s.missing,
         columns: s.columns.map(([, k]) => k),
         days: s.days.map((d) => {
           const r = s.byDay.get(d);
           return { day: d, version: r.version, segments: r.segments.map((g) => ({ segment: g.path, classification: g.classification, engagement: g.engagement })) };
         }),
-        changes: s.changes, notes: s.notes,
+        changes: s.changes, not_compared: s.notCompared, notes: s.notes,
       })),
       skipped: loaded.skipped.map(([where, reason]) => ({ where, reason })),
       warnings: grouped(loaded.warnings).map(([warning, times, first, detail]) => ({ warning, times, first, detail })),
@@ -785,7 +833,7 @@
     const ss = streams(loaded.reports);
     const lines = ['# APRF placement summary', '', countsLine(loaded, ss) + ' ' + CAVEAT, ''];
     for (const s of ss) {
-      lines.push('## ' + md(s.source) + ': ' + md(s.domain) + ', selector ' + md(s.selector), '', span(s), '');
+      lines.push('## ' + md(s.source) + ': ' + md(s.heading) + ', selector ' + md(s.selector), '', span(s), '');
       const cols = s.columns.map(([, k]) => k);
       if (!cols.length) { lines.push(NO_COUNTS, ''); continue; }
       lines.push('| Day | Segment | ' + cols.map(md).join(' | ') + ' |');
@@ -849,7 +897,7 @@ tr.gap td{background:var(--gap);color:var(--muted)}tr.trend td{border-bottom:2px
     ];
     for (const s of ss) {
       const cols = s.columns.map(([, k]) => k);
-      parts.push('<h2>' + esc(s.source) + ': ' + esc(s.domain) + ', selector ' + esc(s.selector) + '</h2>');
+      parts.push('<h2>' + esc(s.source) + ': ' + esc(s.heading) + ', selector ' + esc(s.selector) + '</h2>');
       if (!cols.length) { parts.push('<p class=muted>' + esc(span(s)) + '</p><p>' + NO_COUNTS + '</p>'); continue; }
       parts.push('<p class=muted>' + esc(span(s)) + '</p><div class=wrap><table><thead><tr><th>Day<th>Segment');
       parts.push(cols.map((c) => '<th>' + esc(c)).join('') + '</thead><tbody>');

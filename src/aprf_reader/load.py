@@ -269,15 +269,24 @@ def load(paths: Iterable[Path], pasted: bytes | None = None,
 
     parsed: dict[str, list | ReportError] = {}
 
+    def current(items: list) -> bool:
+        """Whether reading these reports again would change nothing: for each day they hold,
+        the copy kept is still the last one they give for that day."""
+        last = {r.key: r for r in items if isinstance(r, Report)}
+        return all(k in seen_keys and seen_keys[k][1] is r for k, r in last.items())
+
     def add(where: str, data: bytes, mail: Mail | None) -> None:
         digest = hashlib.sha256(data).hexdigest()
-        copy = digest in parsed
-        if not copy:
+        seen = digest in parsed
+        if not seen:
             try:
                 parsed[digest] = parse_items(data)
             except ReportError as e:
                 parsed[digest] = e
         items = parsed[digest]
+        # A file read before is a copy only while what it holds is what is kept. After a changed
+        # copy of the same day (A, then B, then A again), A is the later copy and replaces B.
+        copy = seen and (isinstance(items, ReportError) or current(items))
         # An email is checked even when its report was already read from another file
         if mail is not None and not isinstance(items, ReportError):
             out.warnings += [(w, d, where) for w, d in _mail_warnings(mail, items)]

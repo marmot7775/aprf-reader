@@ -6,13 +6,20 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date, timedelta
 from functools import cached_property
+from math import gcd
 
 from .report import ENGAGEMENT_NAMES, PLACEMENT_NAMES, Report, uses_sdi
 
 
 # Counts where a jump up is bad news, or a drop is
 CHANGES = {"unwanted": "rise", "negative": "rise", "inbox": "fall"}
+# A move must be at least two of the stream's steps, and never needs to be more than 200:
+# Comcast counts in steps of 100. Section 6 leaves bucketing and bucket size to each provider.
 MIN_MOVE = 200
+# Why a stream with no changes was not checked for any (Stream.not_compared)
+ONE_REPORT = "One report day so far, so nothing to compare."
+NOTHING_COMPARED = ("Nothing to compare: no two reports in a row carry an inbox, unwanted "
+                    "or negative count.")
 # The row for a report day whose body has no segments
 NO_COUNTS_ROW = "no counts"
 
@@ -30,9 +37,17 @@ class Row:
 @dataclass
 class Stream:
     source: str
+    # As the stream's first report writes them; streams group by domain_key and the selector
+    # without case, so bücher.example and xn--bcher-kva.example are one stream
     domain: str
     selector: str
     by_day: dict[date, Report]
+    domain_key: str = ""
+
+    @property
+    def heading(self) -> str:
+        """The domain as written, with the form it is grouped by when that looks different."""
+        return self.domain if self.domain.lower() == self.domain_key else f"{self.domain} ({self.domain_key})"
 
     @cached_property
     def first(self) -> date:
@@ -89,6 +104,29 @@ class Stream:
         return [(x, v) for x, v in self._series(col) if v is not None]
 
     @cached_property
+    def step(self) -> int:
+        """The step every count in the stream is a multiple of: 100 for Comcast's buckets,
+        1 for exact counts, 0 when every count is zero."""
+        return gcd(*(n for r in self.by_day.values() for s in r.segments
+                     for c in (s.classification, s.engagement) for n in c.values()))
+
+    @cached_property
+    def min_move(self) -> int:
+        """A move of one step is rounding, so a change must be two steps, up to 200."""
+        return min(MIN_MOVE, 2 * self.step) if self.step else MIN_MOVE
+
+    @cached_property
+    def not_compared(self) -> str | None:
+        """Why no day could be held against the one before, or None when one was. "No changes"
+        is only an all-clear when something was compared."""
+        if len(self.by_day) < 2:
+            return ONE_REPORT
+        for pts in (self._series(col) for col, (_, k) in enumerate(self.columns) if k in CHANGES):
+            if any(a is not None and b is not None for (_, a), (_, b) in zip(pts, pts[1:])):
+                return None
+        return NOTHING_COMPARED
+
+    @cached_property
     def changes(self) -> list[str]:
         """Day-to-day moves big enough to look at, between one report day and the next."""
         out = []
@@ -101,10 +139,10 @@ class Stream:
                 # Nothing is computed across a day that does not carry the count
                 if old is None or new is None:
                     continue
-                # Comcast's buckets are 100 wide, so a move under two buckets is noise
-                if rule == "rise" and new >= 2 * old and new - old >= MIN_MOVE:
+                # A move of one bucket is rounding (min_move)
+                if rule == "rise" and new >= 2 * old and new - old >= self.min_move:
                     verb = "rose"
-                elif rule == "fall" and 2 * new <= old and old - new >= MIN_MOVE:
+                elif rule == "fall" and 2 * new <= old and old - new >= self.min_move:
                     verb = "fell"
                 else:
                     continue
@@ -133,7 +171,11 @@ def streams(reports: list[Report]) -> list[Stream]:
     groups: dict[tuple[str, str, str], dict[date, Report]] = defaultdict(dict)
     for r in reports:
         groups[r.stream_key][r.day] = r
-    return [Stream(src, dom, sel, days) for (src, dom, sel), days in sorted(groups.items())]
+    out = []
+    for (src, dom, _), days in sorted(groups.items()):
+        first = days[min(days)]
+        out.append(Stream(src, first.dkim_domain, first.dkim_selector, days, dom))
+    return out
 
 
 def grouped(warnings: list[tuple[str, str, str]]) -> list[tuple[str, int, str, str]]:
@@ -158,13 +200,13 @@ def to_dict(loaded) -> dict:
     return {
         "reports": len(reports),
         "streams": [{
-            "source": s.source, "domain": s.domain, "selector": s.selector,
+            "source": s.source, "domain": s.domain, "domain_key": s.domain_key, "selector": s.selector,
             "first": str(s.first), "last": str(s.last), "missing_days": s.missing,
             "columns": [k for _, k in s.columns],
             "days": [{"day": str(d), "version": r.version, "segments": [
                 {"segment": list(seg.path), "classification": seg.classification, "engagement": seg.engagement}
                 for seg in r.segments]} for d, r in sorted(s.by_day.items())],
-            "changes": s.changes, "notes": s.notes,
+            "changes": s.changes, "not_compared": s.not_compared, "notes": s.notes,
         } for s in streams(reports)],
         "skipped": [{"where": w, "reason": r} for w, r in skipped],
         "warnings": [{"warning": w, "times": n, "first": where, "detail": d} for w, n, where, d in grouped(loaded.warnings)],

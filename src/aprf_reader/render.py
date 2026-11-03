@@ -21,7 +21,8 @@ def _warning(w: str, times: int, where: str, detail: str) -> str:
 NO_COUNTS = "These reports carry no counts."
 
 CAVEAT = (
-    "Counts are bucket upper bounds chosen by each provider: a ceiling, not an exact figure. "
+    "Providers may round counts into buckets of a size they choose (Comcast's are steps of 100). "
+    "A bucketed count is the bucket's upper bound: a ceiling, not an exact figure. "
     "Placement counts mail received that day; engagement counts actions taken that day on mail "
     "from any day. Dividing one count by another gives a ratio nobody measured."
 )
@@ -71,7 +72,7 @@ def to_markdown(loaded: Loaded) -> str:
     ss = streams(loaded.reports)
     lines = ["# APRF placement summary", "", f"{_counts(loaded, ss)} {CAVEAT}", ""]
     for s in ss:
-        lines += [f"## {_md(s.source)}: {_md(s.domain)}, selector {_md(s.selector)}", "", _span(s), ""]
+        lines += [f"## {_md(s.source)}: {_md(s.heading)}, selector {_md(s.selector)}", "", _span(s), ""]
         cols = [k for _, k in s.columns]
         if not cols:
             lines += [NO_COUNTS, ""]
@@ -141,7 +142,7 @@ def to_html(loaded: Loaded) -> str:
     ]
     for s in ss:
         cols = [k for _, k in s.columns]
-        parts.append(f"<h2>{e(s.source)}: {e(s.domain)}, selector {e(s.selector)}</h2>")
+        parts.append(f"<h2>{e(s.source)}: {e(s.heading)}, selector {e(s.selector)}</h2>")
         if not cols:
             parts.append(f"<p class=muted>{e(_span(s))}</p><p>{NO_COUNTS}</p>")
             continue
@@ -233,7 +234,7 @@ def to_terminal(loaded: Loaded, color: bool = True, width: int = 100) -> str:
     out = [st.bold("APRF placement summary") + st.dim(f"  {_counts(loaded, ss)}"), ""]
     out += [st.dim(line) for line in _wrap(CAVEAT, min(width, 100))] + [""]
     for s in ss:
-        out.append(st.accent(clean(s.domain)) + "  " + st.bold(f"selector {clean(s.selector)}"))
+        out.append(st.accent(clean(s.heading)) + "  " + st.bold(f"selector {clean(s.selector)}"))
         meta = [clean(s.source), _range(s.first, s.last), _plural(len(s.by_day), "report")]
         line = st.dim(" · ".join(meta))
         if s.missing:
@@ -257,6 +258,9 @@ def to_terminal(loaded: Loaded, color: bool = True, width: int = 100) -> str:
             out.append(st.bold("  Changes worth a look"))
             out += [f"  {st.warn('!')} " + re.sub(r"(\d{4})-(\d\d)-(\d\d)", lambda m: _date(date.fromisoformat(m[0])), clean(c))
                     for c in s.changes]
+        elif s.not_compared:
+            # No changes because nothing could be compared is not an all-clear
+            out += [st.dim(line) for line in _wrap(s.not_compared, width - 4, "  · ")]
         else:
             out.append(f"  {st.good('✓')} " + st.dim("No big day-to-day moves in inbox, unwanted, or negative counts."))
         for n in s.notes:
