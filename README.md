@@ -74,9 +74,13 @@ on stderr and at the end of the summary, each with a reason.
 Each stream (provider, signing domain, selector) gets a table with one row per
 day and segment, a trend line per count, and a row for each day with no report.
 A change worth a look is a day when unwanted mail or negative reactions at
-least doubled and grew by 200 or more, or inbox mail fell by half and by 200
-or more, against the report before. Comcast counts in steps of 100, so smaller
-moves are left out as rounding.
+least doubled, or inbox mail fell by half, against the report before, and the
+count moved by at least two of the stream's steps, or by 200, whichever is
+smaller. The step is the largest number every count in the stream is a
+multiple of: 100 for Comcast, 1 for a provider that sends exact counts. A move
+of one step is left out as rounding. With one report, or no inbox, unwanted or
+negative count on two reports in a row, nothing was compared, and the reader
+says so rather than calling the stream steady.
 A change in the report's `version` field is called out, since the draft uses it
 to mark a change in what a category counts.
 
@@ -87,7 +91,8 @@ to mark a change in what a category counts.
   duplicates and files it cannot read, with a reason for each.
 - Summarise placement per signing domain and selector: inbox, unwanted and
   recipient reactions, by day and as a trend.
-- Treat the counts as what the draft says they are: rounded into buckets, so
+- Treat the counts as what the draft lets them be: often rounded into
+  buckets whose size each provider picks (Comcast's are steps of 100), so
   they are a signal, not exact rates.
 - Write a Markdown summary and a single self-contained HTML page you can open
   or share. The command line tool sends nothing anywhere; with `--imap` it
@@ -146,7 +151,8 @@ discussion is the [thread on the -01 I-D Action](https://mailarchive.ietf.org/ar
 ## How it decides
 
 - **The same day twice, from the same provider:** the later copy replaces the
-  earlier one, as section 8.2 says, with a warning that says whether the
+  earlier one, as section 8.2 says, even when it repeats a copy read before it
+  (A, then a changed B, then A again keeps A), with a warning that says whether the
   replaced copy had a different `version` or different counts. `version`
   marks a difference, not an order, so later means read later: arrival order
   for a mailbox or mbox, and for files, name order and then position in the
@@ -154,7 +160,9 @@ discussion is the [thread on the -01 I-D Action](https://mailarchive.ietf.org/ar
 - **The same day from two providers:** both are kept, as separate streams.
 - **Names:** signing domains and selectors compare without case, and an
   international domain matches its `xn--` form, so `bücher.example` and
-  `xn--bcher-kva.example` are one stream.
+  `xn--bcher-kva.example` are one stream. A stream is headed with the domain
+  and selector as its first report writes them, and the `xn--` form follows in
+  brackets when it differs; `--json` gives it as `domain_key`.
 - **The reporting window:** section 5.1 says a report MUST cover one UTC day,
   from 00:00:00 to 23:59:59. A report that covers more, or is shifted off the
   day boundary, is skipped with a reason that names section 5.1.

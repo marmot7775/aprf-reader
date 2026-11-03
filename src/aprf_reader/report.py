@@ -7,6 +7,7 @@ edit to this file.
 from __future__ import annotations
 
 import json
+import math
 import re
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
@@ -30,8 +31,9 @@ DAY = 86400
 ONE_DAY = "not one UTC day from 00:00:00 to 23:59:59, which draft section 5.1 requires"
 # Placement names section 6 gives as examples; engagement names section 5.2.2 lists
 NAMED_CLASSIFICATION = ("inbox", "unwanted", "forwarded", "promotional")
-# sdi as published in DNS (section 4): a header field name, a comma, one separator character
-SDI_FORMAT = re.compile(r"[!-9;-~]+,\S")
+# sdi as published in DNS (section 4): a header field name, a comma, one separator character.
+# Section 4.1: the separator MUST NOT be any of ";=,". The field name may hold ";" itself.
+SDI_FORMAT = re.compile(r"[!-9;-~]+,[^\s;=,]")
 
 
 class ReportError(ValueError):
@@ -106,6 +108,14 @@ def _int(v: object) -> int | None:
     return v if isinstance(v, int) else None
 
 
+def _shown(v: object) -> str:
+    """A value as it appears in a message, as JavaScript's JSON.stringify writes it: a number
+    too large to hold (Infinity once read) is null there, so it is null here too."""
+    if isinstance(v, float) and not math.isfinite(v):
+        return "null"
+    return json.dumps(v, ensure_ascii=False, separators=(',', ':'))
+
+
 def _counts(value: object, where: str, section: str) -> dict[str, int]:
     if value is None:
         return {}
@@ -115,7 +125,7 @@ def _counts(value: object, where: str, section: str) -> dict[str, int]:
     for name, n in value.items():
         k = _int(n)
         if k is None or k < 0 or k > MAX_COUNT:
-            raise ReportError(f"{where}.{name} is not a count ({section}): {json.dumps(n, ensure_ascii=False, separators=(',', ':'))}")
+            raise ReportError(f"{where}.{name} is not a count ({section}): {_shown(n)}")
         out[str(name)] = k
     return out
 
@@ -232,7 +242,7 @@ def _warnings(h: dict, segments: tuple[Segment, ...]) -> tuple[tuple[str, str], 
         raw = h["sdi_used"]
         if not (raw in ("N/A", "N/F") or (isinstance(raw, str) and SDI_FORMAT.fullmatch(raw))):
             out.append(("sdi_used is not N/A, N/F, or the sdi value as published in DNS (section 5.2.1)",
-                        json.dumps(raw, ensure_ascii=False, separators=(',', ':'))))
+                        _shown(raw)))
     for name in ("contact_info", "extra_info"):
         if h.get(name) is not None and _text(h[name]) is None:
             out.append((f"header.{name} is not text or a number (section 5.2.1); ignored", ""))
@@ -270,14 +280,38 @@ def _no_constant(name: str) -> None:
     raise json.JSONDecodeError(f"{name} is not valid JSON", name, 0)
 
 
+def _number(text: str) -> int | float:
+    """A JSON integer. One too large for a JavaScript number reads as Infinity there, and as
+    infinity here, so both refuse it with the same reason; int() would also refuse more than
+    4,300 digits with an error of its own."""
+    f = float(text)
+    return f if math.isinf(f) else int(text)
+
+
+# A backslash escape in JSON text. A \uD800 to \uDFFF escape that is not half of a pair is a
+# lone surrogate: valid JSON, but no character, and it cannot be written as UTF-8. Both readers
+# read it as U+FFFD, as a browser shows it. Each backslash takes the character after it, so an
+# escaped backslash is never read as the start of an escape.
+_ESCAPE = re.compile(r"\\(?:u[dD][89abAB][0-9a-fA-F]{2}\\u[dD][c-fC-F][0-9a-fA-F]{2}|(u[dD][89a-fA-F][0-9a-fA-F]{2})|[\s\S])")
+_SURROGATE = re.compile(r"\\u[dD][89a-fA-F]")
+
+
+def _no_lone_surrogates(text: str) -> str:
+    if not _SURROGATE.search(text):
+        return text
+    return _ESCAPE.sub(lambda m: "\\ufffd" if m[1] else m[0], text)
+
+
 def parse_items(data: bytes) -> list[Report | ReportError]:
     """Each report in a document, or the reason it cannot be read, so one bad
     report does not cost the rest of the file."""
     try:
         # RFC 8259 section 8.1: UTF-8 only. json.loads on bytes would also take UTF-16 and UTF-32,
         # which the web page refuses; a leading byte order mark is allowed, as the browser allows it
-        doc = json.loads(data.decode("utf-8-sig"), parse_constant=_no_constant)
-    except (UnicodeDecodeError, json.JSONDecodeError) as e:
+        text = _no_lone_surrogates(data.decode("utf-8-sig"))
+        doc = json.loads(text, parse_constant=_no_constant, parse_int=_number)
+    # ValueError is a backstop: JSONDecodeError and UnicodeDecodeError are both ValueErrors
+    except ValueError as e:
         raise ReportError(f"not valid JSON, which section 5 requires: {e}") from None
     except RecursionError:
         raise ReportError(TOO_DEEP) from None

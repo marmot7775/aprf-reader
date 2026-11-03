@@ -19,6 +19,29 @@ from .render import clean, to_html, to_markdown, to_terminal
 from .summary import to_dict
 
 
+def _unwritable(path: Path) -> str | None:
+    """Why a file cannot be written at path, checked before any reading starts, so a typo in
+    an output path does not cost a long IMAP fetch. None when it looks writable."""
+    if path.is_dir():
+        return "is a folder"
+    folder = path.parent
+    if not folder.is_dir():
+        return f"no such folder {folder}"
+    if not os.access(folder, os.W_OK):
+        return f"no permission to write in {folder}"
+    return None
+
+
+def _write(path: Path, text: str) -> str | None:
+    """Write text to path; the reason it failed, or None."""
+    try:
+        # A lone surrogate from a file name or mail header cannot be UTF-8; write it as \udXXX
+        path.write_text(text, encoding="utf-8", errors="backslashreplace")
+    except OSError as e:
+        return e.strerror or str(e)
+    return None
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="aprf-reader", description="Summarise APRF placement reports.")
     p.add_argument("paths", nargs="*", type=Path,
@@ -44,6 +67,10 @@ def main(argv: list[str] | None = None) -> int:
     for path in paths:
         if not path.exists():
             p.error(f"no such file or folder: {path}")
+    for out in (args.md, args.html):
+        if out is not None and (why := _unwritable(out)):
+            print(f"aprf-reader: cannot write {clean(str(out))}: {clean(why)}", file=sys.stderr)
+            return 2
     pasted = sys.stdin.buffer.read() if len(paths) < len(args.paths) else None
     messages = []
     if args.imap:
@@ -81,13 +108,17 @@ def main(argv: list[str] | None = None) -> int:
     else:
         color = "NO_COLOR" not in os.environ and os.environ.get("TERM") != "dumb"
         text = to_terminal(loaded, color=color, width=shutil.get_terminal_size().columns)
-    if args.md:
-        args.md.write_text(text, encoding="utf-8")
-    else:
-        sys.stdout.write(text)
-    if args.html:
-        args.html.write_text(to_html(loaded), encoding="utf-8")
-    return 0
+    failed = 0
+    if args.md and (why := _write(args.md, text)):
+        print(f"aprf-reader: cannot write {clean(str(args.md))}: {clean(why)}", file=sys.stderr)
+        failed = 2
+    elif not args.md:
+        # A lone surrogate from a file name or mail header cannot be UTF-8; write it as \udXXX
+        sys.stdout.write(text.encode("utf-8", "backslashreplace").decode("utf-8"))
+    if args.html and (why := _write(args.html, to_html(loaded))):
+        print(f"aprf-reader: cannot write {clean(str(args.html))}: {clean(why)}", file=sys.stderr)
+        failed = 2
+    return failed
 
 
 if __name__ == "__main__":

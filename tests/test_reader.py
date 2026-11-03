@@ -203,10 +203,10 @@ def test_changes_flag_big_moves_only():
         "inbox fell from 2,200 on 2026-09-25 to 600 on 2026-09-26.",
     ]
     assert s2.changes == []  # steady stream, nothing flagged
-    # 10 to 200 is many times higher but under two buckets of movement
-    (s,) = streams([parse(json.dumps(report(0, inbox=100)).encode())[0],
-                    parse(json.dumps(report(1, inbox=100) | {"body": [{"classification": {"unwanted": 200}}]}).encode())[0]])
-    assert not any("unwanted" in c for c in s.changes)
+    # In counts that come in steps of 100, 100 to 200 doubles but is one step: rounding
+    (s,) = streams([parse(json.dumps(report(0) | {"body": [{"classification": {"inbox": 100, "unwanted": 100}}]}).encode())[0],
+                    parse(json.dumps(report(1) | {"body": [{"classification": {"unwanted": 200}}]}).encode())[0]])
+    assert s.step == 100 and not any("unwanted" in c for c in s.changes)
 
 
 def test_json_output(capsys):
