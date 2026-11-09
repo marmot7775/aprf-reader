@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // build.js: inline src and ui into one self-contained page, as the Email
 // Header Decoder does. dist/index.html opens from disk. Its Content-Security-Policy
-// lets the page connect only to dns-audit.com, for the usage note after each use,
+// lets the page connect only to dns-audit.com, for the usage notes (one per visit, one per use),
 // and script-src allows only the hashes of the two inline scripts: the theme
 // script in the head and the page script. The rest of dist is what the static
 // host serves beside it.
@@ -13,7 +13,7 @@ const crypto = require('crypto');
 const ROOT = __dirname;
 const REPO = path.join(ROOT, '..');
 const SITE = 'https://aprf.dns-audit.com/';
-// Where the page sends its usage note (POST /api/usage on the dns-audit.com server)
+// Where the page sends its usage notes (POST /api/usage on the dns-audit.com server)
 const USAGE_ORIGIN = 'https://dns-audit.com';
 // Synthetic, never a real report
 const SAMPLE = path.join(REPO, 'tests/fixtures/sample_six_weeks.json');

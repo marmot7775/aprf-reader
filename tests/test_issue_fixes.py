@@ -118,23 +118,32 @@ def test_saved_page_does_not_claim_nothing_left(tmp_path):
 
 @needs_node
 def test_usage_note_carries_no_domains():
-    """CLAUDE.md: the usage note never carries report content, domains, or addresses."""
+    """CLAUDE.md: the usage notes never carry report content, domains, or addresses."""
     js = r"""
 const fs = require('fs');
 const src = fs.readFileSync(process.argv[1], 'utf8');
-// Any signature: the policy under test is what note() posts, not how it is called
-const m = /function note\([^)]*\) \{[\s\S]*?\n  \}\n/.exec(src);
-if (!m) throw new Error('note() not found');
+// Any signature: the policy under test is what the notes post, not how they are called
+const cut = (name) => {
+  const m = new RegExp('function ' + name + '\\([^)]*\\) \\{[\\s\\S]*?\\n  \\}\\n').exec(src);
+  if (!m) throw new Error(name + '() not found');
+  return m[0];
+};
+// The visit note, sent once when the page opens
+const visit = /\n  send\(\{ tool: 'aprf-reader', visit: true[^\n]*\n/.exec(src);
+if (!visit) throw new Error('visit note not found');
 const posted = [];
 const fetch = (url, opts) => { posted.push(opts.body); return Promise.resolve(); };
 const document = { referrer: '' }, location = { hostname: 'aprf.dns-audit.com' };
 const APRF = { streams: () => [{ domain: 'client-example.com' }], skipCode: () => 'parse_failed' };
 // eval is intended: it runs only note(), cut from this repository's own app.js, with stubbed globals
-eval(m[0] + ';note({ reports: [1], warnings: [], skipped: [], copies: 0 }, false, "ok")');
+eval(cut('referrerHost') + cut('send') + cut('note') + visit[0] + ';note({ reports: [1], warnings: [], skipped: [], copies: 0 }, false, "ok")');
 process.stdout.write(posted.join('\n'));
 """
     out = subprocess.run([NODE, "-e", js, str(ROOT / "web/ui/app.js")], check=True, capture_output=True).stdout.decode()
-    assert out and "client-example.com" not in out and "domains" not in out
+    visit, use = out.split("\n")
+    assert json.loads(visit) == {"tool": "aprf-reader", "visit": True}
+    assert '"status":"ok"' in use
+    assert "client-example.com" not in out and "domains" not in out
 
 
 # ---- #15, #19, #20: header values mean the same thing in both readers ----

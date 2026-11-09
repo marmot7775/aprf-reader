@@ -183,8 +183,8 @@ discussion is the [thread on the -01 I-D Action](https://mailarchive.ietf.org/ar
 emails, forwarded emails, mailbox exports, duplicates and hostile text) and
 requires the same JSON, Markdown and HTML output, so the page and the command
 line cannot drift apart. `node web/build.js` inlines everything into one
-`web/dist/index.html` whose Content Security Policy allows one connection, the
-usage note to dns-audit.com, and it also works saved to disk. A merge to main that passes the
+`web/dist/index.html` whose Content Security Policy allows one destination, the
+usage notes to dns-audit.com (one when the page opens, one after each read), and it also works saved to disk. A merge to main that passes the
 tests deploys it to Cloudflare.
 
 ## Related
